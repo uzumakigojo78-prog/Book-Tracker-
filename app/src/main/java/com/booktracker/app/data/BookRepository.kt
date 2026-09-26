@@ -51,6 +51,9 @@ class BookRepository(context: Context) {
         }
     }
 
+    /** Replaces the whole library, e.g. when restoring a backup. */
+    suspend fun replaceAll(books: List<Book>) = mutate { books }
+
     suspend fun deleteBook(id: String) = mutate { list -> list.filterNot { it.id == id } }
 
     /** Records the page reached on [date], replacing any entry already on that day. */

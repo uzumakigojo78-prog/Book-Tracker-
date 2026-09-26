@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.booktracker.app.ui.screens.BackupScreen
 import com.booktracker.app.ui.screens.BookDetailScreen
 import com.booktracker.app.ui.screens.BookEditorScreen
 import com.booktracker.app.ui.screens.LibraryScreen
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
 // Routes: "library", "add", "detail:<id>", "edit:<id>"
 private const val LIBRARY = "library"
 private const val ADD = "add"
+private const val BACKUPS = "backups"
 private const val DETAIL = "detail:"
 private const val EDIT = "edit:"
 
@@ -91,6 +93,11 @@ fun BookTrackerApp(viewModel: BookViewModel = viewModel()) {
         label = "navigation",
     ) { current ->
         when {
+            current == BACKUPS -> BackupScreen(
+                onBack = { route = LIBRARY },
+                onRestore = { restored -> viewModel.restore(restored) },
+            )
+
             current == ADD -> BookEditorScreen(
                 book = null,
                 onClose = { route = LIBRARY },
@@ -134,6 +141,7 @@ fun BookTrackerApp(viewModel: BookViewModel = viewModel()) {
                 books = books,
                 onAddBook = { route = ADD },
                 onOpenBook = { id -> route = DETAIL + id },
+                onOpenBackups = { route = BACKUPS },
             )
         }
     }

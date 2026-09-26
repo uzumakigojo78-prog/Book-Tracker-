@@ -18,6 +18,11 @@ indicators and springy motion.
   and your current reading streak
 - **Last 14 days chart** and a full day-by-day reading log
 - Quick `+1 / +5 / +10 / +25` buttons and an `END` button for finishing a book
+- **Automatic CSV backups** (Android): every 15 min, 30 min, 1, 3, 6 or 12 hours, daily
+  or weekly, saved as spreadsheet-friendly CSV files in a folder you choose on your
+  phone (newest 50 kept). Includes "Back up now" and "Restore from a CSV backup".
+  The app only asks for access to that folder and for unrestricted battery use so
+  backups run on time.
 - Light and dark themes; your books and reading log are stored on your phone
 
 ## iPhone (and any browser)
@@ -27,7 +32,9 @@ indicators and springy motion.
 3. Open Book Tracker from your home screen: it runs full-screen, works offline and
    keeps your books on your phone.
 
-Use **⋮ → Back up books** now and then to save a copy of your data.
+Use **⋮ → Back up books** (or **Export CSV**) now and then to save a copy of your data.
+Browsers can't run scheduled backups in the background, so automatic backups are
+Android-only.
 
 The web app lives in [`web/`](web) (plain HTML/CSS/JS, no build step) and is
 published to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
