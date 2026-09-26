@@ -21,11 +21,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +53,7 @@ fun LibraryScreen(
     books: List<Book>,
     onAddBook: () -> Unit,
     onOpenBook: (String) -> Unit,
+    onOpenBackups: () -> Unit,
 ) {
     // No top app bar: the heading scrolls with the list so the whole screen is content.
     Scaffold(
@@ -67,7 +70,7 @@ fun LibraryScreen(
     ) { padding ->
         if (books.isEmpty()) {
             Column(Modifier.padding(padding)) {
-                Header(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp))
+                Header(onOpenBackups, Modifier.padding(start = 20.dp, end = 8.dp, top = 12.dp))
                 EmptyLibrary()
             }
         } else {
@@ -84,7 +87,7 @@ fun LibraryScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                item { Header(Modifier.padding(horizontal = 4.dp)) }
+                item { Header(onOpenBackups, Modifier.padding(start = 4.dp)) }
                 item { StatsRow(books) }
                 itemsIndexed(ordered, key = { _, it -> it.value.id }) { _, (colorIndex, book) ->
                     BookCard(book, colorIndex, onClick = { onOpenBook(book.id) }, modifier = Modifier.animateItem())
@@ -95,8 +98,18 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun Header(modifier: Modifier = Modifier) {
-    Text("My Books", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black, modifier = modifier)
+private fun Header(onOpenBackups: () -> Unit, modifier: Modifier = Modifier) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier.fillMaxWidth()) {
+        Text(
+            "My Books",
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Black,
+            modifier = Modifier.weight(1f),
+        )
+        FilledTonalIconButton(onClick = onOpenBackups, modifier = Modifier.size(52.dp)) {
+            Icon(Icons.Rounded.Backup, contentDescription = "Backups")
+        }
+    }
 }
 
 @Composable

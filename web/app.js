@@ -234,7 +234,7 @@ function openLibraryMenu() {
   closeOverlays();
   const menu = document.createElement('div');
   menu.className = 'menu';
-  menu.innerHTML = `<button data-export>Back up books</button><button data-import>Restore from backup</button>`;
+  menu.innerHTML = `<button data-export>Back up books</button><button data-csv>Export CSV (spreadsheet)</button><button data-import>Restore from backup</button>`;
   const scrim = document.createElement('div');
   scrim.className = 'scrim'; scrim.style.background = 'transparent';
   scrim.onclick = closeOverlays;
@@ -242,12 +242,11 @@ function openLibraryMenu() {
 
   menu.querySelector('[data-export]').onclick = () => {
     closeOverlays();
-    const blob = new Blob([JSON.stringify({ version: 1, books }, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `book-tracker-backup-${today()}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    download(JSON.stringify({ version: 1, books }, null, 2), `book-tracker-backup-${today()}.json`, 'application/json');
+  };
+  menu.querySelector('[data-csv]').onclick = () => {
+    closeOverlays();
+    download(booksToCsv(books), `booktracker-backup-${today()}.csv`, 'text/csv');
   };
   menu.querySelector('[data-import]').onclick = () => {
     closeOverlays();
@@ -265,6 +264,27 @@ function openLibraryMenu() {
     };
     input.click();
   };
+}
+
+function download(text, filename, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+/** Same CSV layout as the Android app's backups: one row per logged day. */
+function booksToCsv(list) {
+  const cell = (v) => { const s = String(v ?? ''); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const rows = [['book_id', 'title', 'author', 'release_date', 'total_pages', 'cover_url', 'added_at', 'log_date', 'page_reached', 'pages_read']];
+  for (const b of list) {
+    const base = [b.id, b.title, b.author, b.releaseDate, b.totalPages, b.coverUrl, b.createdAt];
+    const days = dailyPages(b).reverse();
+    if (days.length === 0) rows.push([...base, '', '', '']);
+    days.forEach((d) => rows.push([...base, d.date, d.page, d.read]));
+  }
+  return '\uFEFF' + rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
 }
 
 /* ---------- book detail ---------- */

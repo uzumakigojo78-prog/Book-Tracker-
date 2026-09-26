@@ -3,6 +3,7 @@ package com.booktracker.app
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.booktracker.app.data.Book
 import com.booktracker.app.data.BookDetails
 import com.booktracker.app.data.BookRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,10 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateBook(id: String, details: BookDetails) {
         viewModelScope.launch { repository.updateBook(id, details) }
+    }
+
+    fun restore(books: List<Book>) {
+        viewModelScope.launch { repository.replaceAll(books) }
     }
 
     fun deleteBook(id: String) {
