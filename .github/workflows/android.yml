@@ -50,7 +50,7 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace
+          ./gradlew testReleaseUnitTest assembleRelease --stacktrace
           cp app/build/outputs/apk/release/app-release.apk "BookTracker-${VERSION_NAME}.apk"
 
       - uses: actions/upload-artifact@v4

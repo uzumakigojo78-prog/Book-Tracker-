@@ -137,7 +137,7 @@ private fun BookCard(book: Book, colorIndex: Int, onClick: () -> Unit, modifier:
     ) {
         Column(Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                BookBadge(book.title, colorIndex)
+                BookBadge(book.title, colorIndex, book.coverUrl)
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     Text(

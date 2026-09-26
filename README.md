@@ -7,14 +7,17 @@ extra-round shapes, wavy progress indicators and springy motion.
 
 ## Features
 
-- **Your library**: every book with its name, author, release date and total pages
+- **Your library**: every book with its cover, name, author, release date and total pages
+- **Auto-fill**: start typing a title and pick your book from the suggestions; the
+  author, release date, page count and cover are filled in for you (from
+  [Open Library](https://openlibrary.org) and Google Books, no account needed)
 - **Daily page tracking**: log the page you reached each day (today or any past day);
   the app works out how many pages you read that day
 - **Progress at a glance**: wavy progress bars, a big percentage ring, pages left
   and your current reading streak
 - **Last 14 days chart** and a full day-by-day reading log
 - Quick `+1 / +5 / +10 / +25` buttons and an `END` button for finishing a book
-- Light and dark themes; everything is stored on your phone, no account needed
+- Light and dark themes; your books and reading log are stored on your phone
 
 ## Download
 

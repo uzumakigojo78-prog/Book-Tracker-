@@ -3,6 +3,7 @@ package com.booktracker.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,6 +20,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -132,21 +134,29 @@ fun bookAccent(index: Int): Pair<Color, Color> {
     }
 }
 
-/** A chunky rounded tile with the book's first letter. */
+/**
+ * A book-shaped tile showing the cover when there is one, or the book's first
+ * letter on a bold accent colour.
+ */
 @Composable
-fun BookBadge(title: String, index: Int, size: Dp = 64.dp) {
+fun BookBadge(title: String, index: Int, coverUrl: String? = null, width: Dp = 64.dp, persist: Boolean = true) {
     val (bg, fg) = bookAccent(index)
-    Box(
+    val shape = RoundedCornerShape(width * 0.2f)
+    CoverImage(
+        url = coverUrl,
+        persist = persist,
         modifier = Modifier
-            .size(size)
-            .background(bg, RoundedCornerShape(size * 0.32f)),
-        contentAlignment = Alignment.Center,
+            .size(width = width, height = width * 1.45f)
+            .clip(shape)
+            .background(bg, shape),
     ) {
-        Text(
-            text = title.trim().firstOrNull()?.uppercase() ?: "?",
-            color = fg,
-            fontWeight = FontWeight.Black,
-            fontSize = (size.value * 0.45f).sp,
-        )
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = title.trim().firstOrNull()?.uppercase() ?: "?",
+                color = fg,
+                fontWeight = FontWeight.Black,
+                fontSize = (width.value * 0.5f).sp,
+            )
+        }
     }
 }
