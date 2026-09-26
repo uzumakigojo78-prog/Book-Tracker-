@@ -94,9 +94,7 @@ fun BookTrackerApp(viewModel: BookViewModel = viewModel()) {
             current == ADD -> BookEditorScreen(
                 book = null,
                 onClose = { route = LIBRARY },
-                onSave = { title, author, release, pages ->
-                    viewModel.addBook(title, author, release, pages) { id -> route = DETAIL + id }
-                },
+                onSave = { details -> viewModel.addBook(details) { id -> route = DETAIL + id } },
             )
 
             current.startsWith(DETAIL) || current.startsWith(EDIT) -> {
@@ -111,8 +109,8 @@ fun BookTrackerApp(viewModel: BookViewModel = viewModel()) {
                     BookEditorScreen(
                         book = book,
                         onClose = { route = DETAIL + id },
-                        onSave = { title, author, release, pages ->
-                            viewModel.updateBook(id, title, author, release, pages)
+                        onSave = { details ->
+                            viewModel.updateBook(id, details)
                             route = DETAIL + id
                         },
                     )

@@ -33,16 +33,23 @@ class BookRepository(context: Context) {
         }
     }
 
-    suspend fun addBook(title: String, author: String, releaseDate: LocalDate?, totalPages: Int): String {
+    suspend fun addBook(details: BookDetails): String {
         val id = UUID.randomUUID().toString()
-        mutate { it + Book(id, title, author, releaseDate, totalPages) }
+        mutate { it + Book(id, details.title, details.author, details.releaseDate, details.totalPages, details.coverUrl) }
         return id
     }
 
-    suspend fun updateBook(id: String, title: String, author: String, releaseDate: LocalDate?, totalPages: Int) =
-        mutate { list ->
-            list.map { if (it.id == id) it.copy(title = title, author = author, releaseDate = releaseDate, totalPages = totalPages) else it }
+    suspend fun updateBook(id: String, details: BookDetails) = mutate { list ->
+        list.map {
+            if (it.id != id) it else it.copy(
+                title = details.title,
+                author = details.author,
+                releaseDate = details.releaseDate,
+                totalPages = details.totalPages,
+                coverUrl = details.coverUrl,
+            )
         }
+    }
 
     suspend fun deleteBook(id: String) = mutate { list -> list.filterNot { it.id == id } }
 
@@ -83,6 +90,7 @@ class BookRepository(context: Context) {
                     .put("author", book.author)
                     .put("releaseDate", book.releaseDate?.toString() ?: JSONObject.NULL)
                     .put("totalPages", book.totalPages)
+                    .put("coverUrl", book.coverUrl ?: JSONObject.NULL)
                     .put("createdAt", book.createdAt)
                     .put("entries", JSONArray().apply {
                         book.entries.forEach { entry ->
@@ -105,6 +113,7 @@ class BookRepository(context: Context) {
                 author = o.optString("author"),
                 releaseDate = if (o.isNull("releaseDate")) null else LocalDate.parse(o.getString("releaseDate")),
                 totalPages = o.getInt("totalPages"),
+                coverUrl = if (o.isNull("coverUrl")) null else o.getString("coverUrl"),
                 createdAt = o.optLong("createdAt", 0L),
                 entries = (0 until entries.length()).map { j ->
                     val e = entries.getJSONObject(j)

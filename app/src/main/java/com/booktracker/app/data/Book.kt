@@ -16,6 +16,7 @@ data class Book(
     val author: String,
     val releaseDate: LocalDate?,
     val totalPages: Int,
+    val coverUrl: String? = null,
     val entries: List<ReadingEntry> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
 ) {
@@ -54,4 +55,13 @@ data class DailyPages(
     val date: LocalDate,
     val pageReached: Int,
     val pagesRead: Int,
+)
+
+/** The editable details of a book, as entered in the add/edit form. */
+data class BookDetails(
+    val title: String,
+    val author: String,
+    val releaseDate: LocalDate?,
+    val totalPages: Int,
+    val coverUrl: String?,
 )

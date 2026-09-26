@@ -71,6 +71,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.booktracker.app.data.Book
 import com.booktracker.app.data.DailyPages
+import com.booktracker.app.ui.components.BookBadge
 import com.booktracker.app.ui.components.DatePickerModal
 import com.booktracker.app.ui.components.bookAccent
 import com.booktracker.app.ui.components.bookColors
@@ -188,10 +189,21 @@ private fun HeroCard(book: Book, colorIndex: Int) {
         colors = CardDefaults.cardColors(containerColor = container, contentColor = onContainer),
     ) {
         Column(Modifier.fillMaxWidth().padding(24.dp)) {
-            Text(book.title, style = MaterialTheme.typography.displaySmall)
-            Spacer(Modifier.height(12.dp))
-            if (book.author.isNotBlank()) InfoLine(Icons.Rounded.Person, book.author)
-            InfoLine(Icons.Rounded.Event, book.releaseDate?.let { "Released ${it.pretty()}" } ?: "Release date unknown")
+            Row {
+                if (book.coverUrl != null) {
+                    BookBadge(book.title, colorIndex, book.coverUrl, width = 88.dp)
+                    Spacer(Modifier.width(18.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        book.title,
+                        style = if (book.coverUrl != null) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displaySmall,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    if (book.author.isNotBlank()) InfoLine(Icons.Rounded.Person, book.author)
+                    InfoLine(Icons.Rounded.Event, book.releaseDate?.let { "Released ${it.pretty()}" } ?: "Release date unknown")
+                }
+            }
             Spacer(Modifier.height(24.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.size(170.dp)) {
