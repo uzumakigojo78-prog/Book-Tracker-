@@ -61,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -150,7 +151,13 @@ fun BookEditorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {},
+                title = {
+                    Text(
+                        if (book == null) "Add a book" else "Edit book",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Black,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "Close") }
                 },
@@ -168,10 +175,6 @@ fun BookEditorScreen(
                 .animateContentSize(),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(
-                if (book == null) "Add a book" else "Edit book",
-                style = MaterialTheme.typography.displaySmall,
-            )
             if (book == null) {
                 Text(
                     "Start typing the title and pick your book. We'll fill in the rest.",
@@ -179,7 +182,6 @@ fun BookEditorScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Spacer(Modifier.height(2.dp))
             OutlinedTextField(
                 value = title,
                 onValueChange = {

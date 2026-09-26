@@ -3,6 +3,8 @@ package com.booktracker.app.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,47 +24,36 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.booktracker.app.data.Book
 import com.booktracker.app.ui.components.BookBadge
 import com.booktracker.app.ui.components.bookAccent
 import com.booktracker.app.ui.components.bookColors
 import com.booktracker.app.ui.components.pretty
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
     books: List<Book>,
     onAddBook: () -> Unit,
     onOpenBook: (String) -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    // No top app bar: the heading scrolls with the list so the whole screen is content.
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            LargeTopAppBar(
-                title = { Text("My Books", fontWeight = FontWeight.Black) },
-                scrollBehavior = scrollBehavior,
-            )
-        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onAddBook,
@@ -75,7 +66,10 @@ fun LibraryScreen(
         },
     ) { padding ->
         if (books.isEmpty()) {
-            EmptyLibrary(Modifier.padding(padding))
+            Column(Modifier.padding(padding)) {
+                Header(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp))
+                EmptyLibrary()
+            }
         } else {
             // Unfinished books first, most recently added at the top.
             val ordered = books.withIndex().sortedWith(
@@ -85,11 +79,12 @@ fun LibraryScreen(
                 contentPadding = PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
-                    top = padding.calculateTopPadding() + 8.dp,
+                    top = padding.calculateTopPadding() + 12.dp,
                     bottom = padding.calculateBottomPadding() + 104.dp,
                 ),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
+                item { Header(Modifier.padding(horizontal = 4.dp)) }
                 item { StatsRow(books) }
                 itemsIndexed(ordered, key = { _, it -> it.value.id }) { _, (colorIndex, book) ->
                     BookCard(book, colorIndex, onClick = { onOpenBook(book.id) }, modifier = Modifier.animateItem())
@@ -100,12 +95,21 @@ fun LibraryScreen(
 }
 
 @Composable
+private fun Header(modifier: Modifier = Modifier) {
+    Text("My Books", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black, modifier = modifier)
+}
+
+@Composable
 private fun StatsRow(books: List<Book>) {
     val reading = books.count { !it.isFinished }
     val today = books.sumOf { it.pagesToday }
     val finished = books.count { it.isFinished }
     val c = MaterialTheme.colorScheme
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+    // Equal-height tiles even when a label wraps onto two lines.
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+    ) {
         StatTile("Reading", reading.toString(), c.primary, c.onPrimary, Modifier.weight(1f))
         StatTile("Pages today", today.toString(), c.secondary, c.onSecondary, Modifier.weight(1f))
         StatTile("Finished", finished.toString(), c.tertiary, c.onTertiary, Modifier.weight(1f))
@@ -116,11 +120,12 @@ private fun StatsRow(books: List<Book>) {
 private fun StatTile(label: String, value: String, bg: Color, fg: Color, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
+            .fillMaxHeight()
             .background(bg, MaterialTheme.shapes.large)
             .padding(horizontal = 14.dp, vertical = 16.dp),
     ) {
         Text(value, style = MaterialTheme.typography.displaySmall, color = fg, maxLines = 1)
-        Text(label, style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 2, lineHeight = 18.sp)
     }
 }
 
@@ -189,7 +194,7 @@ private fun BookCard(book: Book, colorIndex: Int, onClick: () -> Unit, modifier:
 @Composable
 private fun EmptyLibrary(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.fillMaxSize().padding(32.dp),
+        modifier = modifier.fillMaxSize().padding(horizontal = 32.dp).padding(bottom = 96.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
