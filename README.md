@@ -2,8 +2,9 @@
 
 Has all details of a book and keeps track of how many pages you read per day.
 
-An Android app built with Jetpack Compose and **Material 3 Expressive**: bold type,
-extra-round shapes, wavy progress indicators and springy motion.
+Available as an **Android app** (Jetpack Compose) and a **web app for iPhone**, both
+styled with **Material 3 Expressive**: bold type, extra-round shapes, wavy progress
+indicators and springy motion.
 
 ## Features
 
@@ -19,7 +20,21 @@ extra-round shapes, wavy progress indicators and springy motion.
 - Quick `+1 / +5 / +10 / +25` buttons and an `END` button for finishing a book
 - Light and dark themes; your books and reading log are stored on your phone
 
-## Download
+## iPhone (and any browser)
+
+1. Open **https://uzumakigojo78-prog.github.io/Book-Tracker-/** in **Safari**.
+2. Tap the **Share** button, then **Add to Home Screen**.
+3. Open Book Tracker from your home screen: it runs full-screen, works offline and
+   keeps your books on your phone.
+
+Use **⋮ → Back up books** now and then to save a copy of your data.
+
+The web app lives in [`web/`](web) (plain HTML/CSS/JS, no build step) and is
+published to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
+If the site isn't live after the first deploy, open **Settings → Pages** and set the
+source to **Deploy from a branch → `gh-pages` / root**.
+
+## Android
 
 1. Open the [**Releases**](../../releases/latest) page of this repository.
 2. Download `BookTracker-x.y.z.apk` on your Android phone (Android 8.0 or newer).
