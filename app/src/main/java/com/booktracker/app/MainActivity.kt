@@ -41,7 +41,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.booktracker.app.ai.GenreViewModel
 import com.booktracker.app.settings.AppearanceSettings
+import com.booktracker.app.ui.screens.AiSettingsPage
+import com.booktracker.app.ui.screens.GenresScreen
 import com.booktracker.app.ui.screens.AppearancePage
 import com.booktracker.app.ui.screens.BackupScreen
 import com.booktracker.app.ui.screens.BookDetailScreen
@@ -78,21 +81,25 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// Tabs: "library", "stats", "settings". Pages: "settings/<page>", "add", "detail:<id>", "edit:<id>".
+// Tabs: "library", "genres", "stats", "settings".
+// Pages: "settings/<page>", "add", "add:<title>", "detail:<id>", "edit:<id>".
 private const val LIBRARY = "library"
+private const val GENRES_TAB = "genres"
 private const val STATS = "stats"
 private const val SETTINGS = "settings"
 private const val SETTINGS_PAGE = "settings/"
 private const val ADD = "add"
+private const val ADD_TITLED = "add:"
 private const val DETAIL = "detail:"
 private const val EDIT = "edit:"
 
 private enum class Tab(val route: String, val label: String) {
-    BOOKS(LIBRARY, "Books"), STATS_TAB(STATS, "Stats"), SETTINGS_TAB(SETTINGS, "Settings");
+    BOOKS(LIBRARY, "Books"), GENRES(GENRES_TAB, "Genres"), STATS_TAB(STATS, "Stats"), SETTINGS_TAB(SETTINGS, "Settings");
 
     val icon: ImageVector
         @Composable get() = when (this) {
             BOOKS -> AppIcons.MenuBook
+            GENRES -> AppIcons.Category
             STATS_TAB -> AppIcons.BarChart
             SETTINGS_TAB -> AppIcons.Settings
         }
@@ -108,14 +115,20 @@ private fun depth(route: String) = when {
 
 private fun parent(route: String) = when {
     route.startsWith(EDIT) -> DETAIL + route.removePrefix(EDIT)
+    route.startsWith(ADD_TITLED) -> GENRES_TAB
     route.startsWith(SETTINGS_PAGE) -> SETTINGS
     else -> LIBRARY
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun BookTrackerApp(appearanceSettings: AppearanceSettings, viewModel: BookViewModel = viewModel()) {
+fun BookTrackerApp(
+    appearanceSettings: AppearanceSettings,
+    viewModel: BookViewModel = viewModel(),
+    genreViewModel: GenreViewModel = viewModel(),
+) {
     val books by viewModel.books.collectAsStateWithLifecycle()
+    val aiKey by genreViewModel.apiKey.collectAsStateWithLifecycle()
     val loaded by viewModel.loaded.collectAsStateWithLifecycle()
     var route by rememberSaveable { mutableStateOf(LIBRARY) }
 
@@ -175,6 +188,15 @@ fun BookTrackerApp(appearanceSettings: AppearanceSettings, viewModel: BookViewMo
                     modifier = tabModifier,
                 )
 
+                current == GENRES_TAB -> GenresScreen(
+                    books = books,
+                    vm = genreViewModel,
+                    onOpenBook = { id -> route = DETAIL + id },
+                    onAddBook = { title -> route = ADD_TITLED + title },
+                    onSetUpAi = { route = SETTINGS_PAGE + SettingsPage.AI.name },
+                    modifier = tabModifier,
+                )
+
                 current == STATS -> StatsScreen(
                     books = books,
                     onOpenBook = { id -> route = DETAIL + id },
@@ -183,6 +205,7 @@ fun BookTrackerApp(appearanceSettings: AppearanceSettings, viewModel: BookViewMo
 
                 current == SETTINGS -> SettingsScreen(
                     appearanceSettings = appearanceSettings,
+                    aiConnected = aiKey != null,
                     onOpen = { page -> route = SETTINGS_PAGE + page.name },
                     modifier = tabModifier,
                 )
@@ -193,15 +216,17 @@ fun BookTrackerApp(appearanceSettings: AppearanceSettings, viewModel: BookViewMo
                         SettingsPage.APPEARANCE -> AppearancePage(appearanceSettings, back)
                         SettingsPage.TEXT -> TextPage(appearanceSettings, back)
                         SettingsPage.STYLE -> StylePage(appearanceSettings, back)
+                        SettingsPage.AI -> AiSettingsPage(genreViewModel, back)
                         SettingsPage.BACKUPS -> BackupScreen(onBack = back, onRestore = { viewModel.restore(it) })
                         null -> LaunchedEffect(current) { route = SETTINGS }
                     }
                 }
 
-                current == ADD -> BookEditorScreen(
+                current == ADD || current.startsWith(ADD_TITLED) -> BookEditorScreen(
                     book = null,
-                    onClose = { route = LIBRARY },
+                    onClose = { route = if (current == ADD) LIBRARY else GENRES_TAB },
                     onSave = { details -> viewModel.addBook(details) { id -> route = DETAIL + id } },
+                    initialTitle = current.removePrefix(ADD_TITLED).takeIf { current != ADD } ?: "",
                 )
 
                 current.startsWith(DETAIL) || current.startsWith(EDIT) -> {

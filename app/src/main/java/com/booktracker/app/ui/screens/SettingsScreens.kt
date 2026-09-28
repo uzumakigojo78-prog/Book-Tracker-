@@ -60,12 +60,13 @@ import com.booktracker.app.ui.theme.isDark
 import com.booktracker.app.ui.theme.paletteSwatch
 import java.time.LocalDate
 
-enum class SettingsPage { APPEARANCE, TEXT, STYLE, BACKUPS }
+enum class SettingsPage { APPEARANCE, TEXT, STYLE, AI, BACKUPS }
 
 /** The Settings tab: one row per settings page. */
 @Composable
 fun SettingsScreen(
     appearanceSettings: AppearanceSettings,
+    aiConnected: Boolean,
     onOpen: (SettingsPage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -104,6 +105,13 @@ fun SettingsScreen(
             NavRow(AppIcons.Style, "Style", "${a.corners.label} corners · ${a.iconStyle.label} icons", c.tertiary, c.onTertiary) {
                 onOpen(SettingsPage.STYLE)
             }
+        }
+        item {
+            NavRow(
+                AppIcons.Psychology, "AI",
+                if (aiConnected) "Claude connected" else "Not set up · genres use basic mode",
+                c.secondaryContainer, c.onSecondaryContainer,
+            ) { onOpen(SettingsPage.AI) }
         }
         item {
             NavRow(

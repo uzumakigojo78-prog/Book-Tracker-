@@ -49,6 +49,19 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/versions/9/module-info.class",
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "META-INF/INDEX.LIST",
+            )
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -68,6 +81,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.1")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("androidx.documentfile:documentfile:1.0.1")
+    // Claude (AI genres & recommendations)
+    implementation("com.anthropic:anthropic-java:2.65.0")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:2.2.0")
 
     // Material 3 Expressive APIs (MaterialExpressiveTheme, MotionScheme.expressive, LoadingIndicator...)
     implementation("androidx.compose.material3:material3:1.4.0-alpha15")

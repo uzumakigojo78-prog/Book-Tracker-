@@ -42,6 +42,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -69,6 +70,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.booktracker.app.ai.OpenLibraryAi
 import com.booktracker.app.data.Book
 import com.booktracker.app.data.DailyPages
 import com.booktracker.app.ui.components.BookBadge
@@ -95,6 +97,7 @@ fun BookDetailScreen(
     onDeleteEntry: (LocalDate) -> Unit,
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
+    var showCopies by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -155,6 +158,16 @@ fun BookDetailScreen(
                     item {
                         TodaySummary(book, colorIndex, onLog = { scope.launch { pager.animateScrollToPage(DetailTab.LOG.ordinal) } })
                     }
+                    item {
+                        OutlinedButton(
+                            onClick = { showCopies = true },
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                        ) {
+                            Icon(AppIcons.Download, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Find online copies", style = MaterialTheme.typography.titleSmall)
+                        }
+                    }
                 }
 
                 DetailTab.LOG -> LazyColumn(contentPadding = listPadding, verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -193,6 +206,15 @@ fun BookDetailScreen(
                 }
             }
         }
+    }
+
+    if (showCopies) {
+        OnlineCopiesSheet(
+            title = book.title,
+            author = book.author,
+            load = { OpenLibraryAi.findCopies(book.title, book.author) },
+            onDismiss = { showCopies = false },
+        )
     }
 
     if (confirmDelete) {
