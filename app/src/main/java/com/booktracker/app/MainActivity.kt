@@ -193,6 +193,7 @@ fun BookTrackerApp(
                     vm = genreViewModel,
                     onOpenBook = { id -> route = DETAIL + id },
                     onAddBook = { title -> route = ADD_TITLED + title },
+                    onAddDirect = { details, onAdded -> viewModel.addBook(details, onAdded) },
                     onSetUpAi = { route = SETTINGS_PAGE + SettingsPage.AI.name },
                     modifier = tabModifier,
                 )

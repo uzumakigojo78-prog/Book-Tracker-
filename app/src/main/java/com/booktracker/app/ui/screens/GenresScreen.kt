@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.booktracker.app.ai.AnalysisSource
+import com.booktracker.app.ai.BookCatalog
+import com.booktracker.app.ai.CatalogBook
 import com.booktracker.app.ai.AiConfig
 import com.booktracker.app.ai.AiProvider
 import com.booktracker.app.ai.GENRES
@@ -54,11 +57,13 @@ import com.booktracker.app.ai.OnlineCopies
 import com.booktracker.app.ai.Recommendation
 import com.booktracker.app.ai.librarySignature
 import com.booktracker.app.data.Book
+import com.booktracker.app.data.BookDetails
 import com.booktracker.app.ui.components.BookBadge
 import com.booktracker.app.ui.components.SectionCard
 import com.booktracker.app.ui.components.bookAccent
 import com.booktracker.app.ui.theme.AppIcons
 import com.booktracker.app.ui.theme.LocalAppearance
+import kotlinx.coroutines.delay
 
 /** Books grouped by genre, plus recommendations, from Claude (with an API key) or Open Library. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -68,9 +73,27 @@ fun GenresScreen(
     vm: GenreViewModel,
     onOpenBook: (String) -> Unit,
     onAddBook: (String) -> Unit,
+    onAddDirect: (BookDetails, (String) -> Unit) -> Unit,
     onSetUpAi: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Search any book (Open Library + Google Books), shown instead of the genres while typing.
+    var query by rememberSaveable { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<CatalogBook>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    var searchedFor by remember { mutableStateOf("") }
+    var infoFor by remember { mutableStateOf<CatalogBook?>(null) }
+    val searchActive = query.trim().length >= 2
+    LaunchedEffect(query) {
+        val q = query.trim()
+        if (q.length < 2) { results = emptyList(); searching = false; searchedFor = ""; return@LaunchedEffect }
+        searching = true
+        delay(400)
+        results = BookCatalog.search(q)
+        searchedFor = q
+        searching = false
+    }
+
     val analysis by vm.analysis.collectAsStateWithLifecycle()
     val running by vm.running.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
@@ -93,11 +116,30 @@ fun GenresScreen(
             Column(Modifier.padding(start = 4.dp, bottom = 4.dp)) {
                 Text("Genres", style = MaterialTheme.typography.displaySmall, fontWeight = LocalAppearance.current.heavyWeight)
                 Text(
-                    "Your books sorted by genre, and what to read next",
+                    "Search any book, see your genres and what to read next",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+
+        item { BookSearchField(query, { query = it }, searching) }
+
+        if (searchActive) {
+            if (!searching && searchedFor == query.trim() && results.isEmpty()) {
+                item {
+                    Text(
+                        "No books found (or you're offline). Try another title, author or topic.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+                }
+            }
+            items(results.withIndex().toList(), key = { (i, b) -> "search-$i-${b.title}-${b.author}" }) { (i, b) ->
+                CatalogRow(b, i % 3, inLibrary = books.any { it.title.equals(b.title, ignoreCase = true) }, onClick = { infoFor = b })
+            }
+            return@LazyColumn
         }
 
         if (books.isEmpty()) {
@@ -182,6 +224,17 @@ fun GenresScreen(
                 }
             }
         }
+    }
+
+    infoFor?.let { b ->
+        BookInfoSheet(
+            initial = b,
+            library = books,
+            onAdd = onAddDirect,
+            onAddWithForm = { title -> infoFor = null; onAddBook(title) },
+            onOpenBook = { id -> infoFor = null; onOpenBook(id) },
+            onDismiss = { infoFor = null },
+        )
     }
 
     sheetFor?.let { (title, author) ->

@@ -13,7 +13,7 @@ import {
   loadFonts, paletteSwatch, setAppearance,
 } from './js/theme.js';
 import { GENRES, PROVIDERS, aiSettings, analyzeWithAi, getConfig, librarySignature, providerById } from './js/ai.js';
-import { analyzeBasic, copiesFrom, findCopies, searchBooks } from './js/lookup.js';
+import { analyzeBasic, catalogDetails, catalogGenres, catalogSearch, copiesFrom, findCopies, searchBooks } from './js/lookup.js';
 
 const app = document.getElementById('app');
 const tabsBar = document.getElementById('tabs');
@@ -590,7 +590,8 @@ async function analyze() {
     genreState.error = e?.message || 'Something went wrong. Try again.';
   }
   genreState.running = false;
-  if (parts()[0] === 'genres') renderGenres('none');
+  // Don't redraw under someone typing a search; the results show when the search is cleared.
+  if (parts()[0] === 'genres' && genreQuery.trim().length < 2) renderGenres('none');
 }
 
 function renderGenres(dir) {
@@ -675,7 +676,15 @@ function renderGenres(dir) {
     }
   }
 
-  app.innerHTML = `<section class="screen ${dir}">${pageHeader('Genres', 'Your books sorted by genre, and what to read next')}${body}</section>`;
+  const searching = genreQuery.trim().length >= 2;
+  app.innerHTML = `<section class="screen ${dir}">${pageHeader('Genres', 'Search any book, see your genres and what to read next')}
+    <label class="field search-field">
+      <input type="search" data-search value="${esc(genreQuery)}" placeholder="Search any book, author or topic" enterkeyhint="search" autocomplete="off" spellcheck="false">
+      ${icon('search', 'lead')}<span class="trail">${genreQuery ? `<button class="icon-btn" data-clear-search aria-label="Clear search">${icon('close')}</button>` : ''}</span>
+    </label>
+    <div data-genres-body>${searching ? searchBodyHtml() : body}</div></section>`;
+  bindSearch();
+  if (searching) return;
   bindBookLinks();
   app.querySelector('[data-analyze]')?.addEventListener('click', analyze);
   app.querySelector('[data-setup-ai]')?.addEventListener('click', () => go('/settings/ai'));
@@ -692,6 +701,139 @@ function renderGenres(dir) {
       card.querySelector('[data-rec-access]').innerHTML = `<span class="pill-tag c2">${c.isFreeDownload ? 'Free download' : 'Borrow free'}</span>`;
     }
   });
+}
+
+/* ---------- search any book (Genres tab) ---------- */
+let genreQuery = '';
+const search = { timer: null, ctl: null, state: 'idle', query: '', results: [] };
+
+function searchBodyHtml() {
+  if (search.state !== 'done' || search.query !== genreQuery.trim()) return '<div class="center" style="padding:32px"><div class="loader big"></div></div>';
+  if (!search.results.length) return `<p class="muted body-l" style="margin:8px 4px">No books found (or you're offline). Try another title, author or topic.</p>`;
+  return `<div class="stack">${search.results.map((b, i) => {
+    const owned = books.some((x) => x.title.toLowerCase() === b.title.toLowerCase());
+    const meta = [b.year, b.pages ? `${b.pages} pages` : '', catalogGenres(b)[0]].filter(Boolean).join(' · ');
+    return `<button class="result-row" data-result="${i}" style="animation-delay:${Math.min(i, 10) * 0.03}s">
+      ${badge(b, i % 3, 'result-badge')}
+      <div class="grow"><div class="title-m clamp2">${esc(b.title)}</div>
+        ${b.author ? `<div class="body-m ellipsis">${esc(b.author)}</div>` : ''}
+        ${meta ? `<div class="meta">${esc(meta)}</div>` : ''}
+        <div class="pills">${owned ? '<span class="pill-tag c1">In your books</span>' : ''}${b.freePdfUrl ? '<span class="pill-tag c2">Free PDF</span>' : b.ebookAccess === 'borrowable' ? '<span class="pill-tag c2">Borrow free</span>' : ''}</div>
+      </div>${icon('chevron_right', 'muted')}
+    </button>`;
+  }).join('')}</div>`;
+}
+
+function updateSearchBody() {
+  const body = app.querySelector('[data-genres-body]');
+  if (!body) return;
+  body.innerHTML = searchBodyHtml();
+  body.querySelectorAll('[data-result]').forEach((el) => { el.onclick = () => showBookInfo(search.results[el.dataset.result]); });
+}
+
+function bindSearch() {
+  const input = app.querySelector('[data-search]');
+  const setQuery = (value) => {
+    const wasSearching = genreQuery.trim().length >= 2;
+    genreQuery = value;
+    clearTimeout(search.timer);
+    search.ctl?.abort();
+    const q = value.trim();
+    if (q.length < 2) {
+      search.state = 'idle';
+      if (wasSearching || !value) {
+        renderGenres('none');
+        const again = app.querySelector('[data-search]');
+        again.focus();
+        again.setSelectionRange(again.value.length, again.value.length);
+      }
+      return;
+    }
+    const trail = app.querySelector('.search-field .trail');
+    if (trail && !trail.innerHTML.trim()) {
+      trail.innerHTML = `<button class="icon-btn" data-clear-search aria-label="Clear search">${icon('close')}</button>`;
+      trail.querySelector('[data-clear-search]').onclick = () => setQuery('');
+    }
+    search.state = 'loading';
+    updateSearchBody();
+    search.timer = setTimeout(async () => {
+      const ctl = new AbortController();
+      search.ctl = ctl;
+      try {
+        const results = await catalogSearch(q, ctl.signal);
+        if (ctl.signal.aborted) return;
+        Object.assign(search, { state: 'done', query: q, results });
+      } catch {
+        if (ctl.signal.aborted) return;
+        Object.assign(search, { state: 'done', query: q, results: [] });
+      }
+      updateSearchBody();
+    }, 400);
+  };
+  input.addEventListener('input', () => setQuery(input.value));
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  app.querySelector('[data-clear-search]')?.addEventListener('click', () => setQuery(''));
+  if (genreQuery.trim().length >= 2) {
+    if (search.query === genreQuery.trim() && search.state === 'done') updateSearchBody();
+    else setQuery(genreQuery);
+  }
+}
+
+/** Everything about a book from search, one-tap add, and a free PDF when it's legally available. */
+function showBookInfo(initial) {
+  let b = initial;
+  let addedId = null;
+  const body = openSheet('');
+  const draw = () => {
+    if (!body.isConnected) return;
+    const genres = catalogGenres(b);
+    const idx = Math.max(0, GENRES.indexOf(genres[0])) % 3;
+    const existing = books.find((x) => x.title.toLowerCase() === b.title.toLowerCase());
+    const openId = addedId || existing?.id;
+    const date = b.releaseDate ? (b.releaseDate.endsWith('-01-01') ? `First published ${b.releaseDate.slice(0, 4)}` : `Released ${prettyDate(b.releaseDate)}`) : null;
+    const link = (ic, text, url) => `<a class="btn outline big link-btn" href="${esc(url)}" target="_blank" rel="noopener">${icon(ic)}<span class="grow">${text}</span>${icon('open_in_new')}</a>`;
+    body.innerHTML = `
+      <div class="row" style="align-items:flex-start">
+        ${badge(b, idx, 'info-badge')}
+        <div class="grow">
+          <h2 class="headline-s">${esc(b.title)}</h2>
+          ${b.author ? `<div class="title-m">by ${esc(b.author)}</div>` : ''}
+          <div class="facts">
+            ${date ? `<div>${icon('event')}${esc(date)}</div>` : ''}
+            ${b.pages ? `<div>${icon('menu_book')}${b.pages} pages</div>` : ''}
+            ${b.publisher ? `<div>${icon('category')}${esc(b.publisher)}</div>` : ''}
+            ${b.rating ? `<div>${icon('bar_chart')}${Number(b.rating).toFixed(1)} / 5 rating</div>` : ''}
+          </div>
+        </div>
+      </div>
+      ${genres.length ? `<div class="pills" style="margin-top:14px">${genres.map((g) => `<span class="pill-tag k${idx}" style="background:var(--accent);color:var(--on-accent)">${esc(g)}</span>`).join('')}</div>` : ''}
+      <div class="stack" style="margin-top:18px">
+        ${openId ? `<button class="btn big filled added" data-open-book="${esc(openId)}">${icon('check_circle')}${addedId ? 'Added · Open book' : 'In your books · Open'}</button>`
+          : `<button class="btn big filled" data-add-book>${icon('library_add')}${b.pages ? 'Add to my books' : 'Add to my books…'}</button>`}
+        ${b.freePdfUrl ? `<a class="btn big pdf-btn" href="${esc(b.freePdfUrl)}" target="_blank" rel="noopener">${icon('download')}Download free PDF</a>
+          <p class="body-s muted" style="margin:-4px 8px 0">Public domain, free and legal to download.</p>`
+          : `<div class="note-box">${icon('lock')}<span>No free PDF: this book is still under copyright. You can borrow it or buy it below.</span></div>`}
+        ${b.ebookAccess === 'borrowable' ? link('menu_book', 'Borrow free on Open Library', b.workKey ? `https://openlibrary.org${b.workKey}` : `https://openlibrary.org/search?q=${encodeURIComponent(b.title)}`) : ''}
+        ${b.freePdfUrl && b.iaId ? link('download', 'Other formats (EPUB, text)', `https://archive.org/details/${b.iaId}`) : ''}
+        ${b.googlePreviewUrl ? link('open_in_new', 'Preview on Google Books', b.googlePreviewUrl) : ''}
+        ${link('link', 'Open Library page', b.workKey ? `https://openlibrary.org${b.workKey}` : `https://openlibrary.org/search?q=${encodeURIComponent(`${b.title} ${b.author}`)}`)}
+      </div>
+      ${b.description ? `<h3 class="title" style="margin:20px 0 6px">About this book</h3><p class="body-l description">${esc(b.description)}</p>`
+        : b.workKey ? '<div class="center" style="padding:16px"><div class="loader"></div></div>' : ''}`;
+    body.querySelector('[data-open-book]')?.addEventListener('click', () => { closeSheet(); go('/book/' + body.querySelector('[data-open-book]').dataset.openBook); });
+    body.querySelector('[data-add-book]')?.addEventListener('click', () => {
+      if (!b.pages) { closeSheet(); go('/add/' + encodeURIComponent(b.title)); return; }
+      const book = { id: uuid(), title: b.title, author: b.author, releaseDate: b.releaseDate, totalPages: b.pages, coverUrl: b.coverUrl, entries: [], createdAt: Date.now() };
+      books.push(book);
+      saveBooks();
+      addedId = book.id;
+      toast(`Added “${b.title}” to your books`);
+      draw();
+      updateSearchBody();
+    });
+  };
+  draw();
+  catalogDetails(b).then((full) => { b = full; draw(); });
 }
 
 /** Bottom sheet with free, legal places to read, borrow or download a book. */
