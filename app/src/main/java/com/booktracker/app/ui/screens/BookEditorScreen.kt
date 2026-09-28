@@ -1,5 +1,6 @@
 package com.booktracker.app.ui.screens
 
+import com.booktracker.app.ui.components.ButtonText
 import com.booktracker.app.ui.theme.AppIcons
 import com.booktracker.app.ui.theme.LocalAppearance
 import androidx.compose.animation.AnimatedContent
@@ -294,7 +295,7 @@ fun BookEditorScreen(
                     .fillMaxWidth()
                     .height(64.dp),
             ) {
-                Text(if (book == null) "Add book" else "Save changes", style = MaterialTheme.typography.titleMedium)
+                ButtonText(if (book == null) "Add book" else "Save changes", MaterialTheme.typography.titleMedium)
             }
             Spacer(Modifier.height(24.dp))
         }

@@ -68,6 +68,10 @@ object CoverCache {
         }
     }.getOrNull()?.takeIf { it.size > 100 } // skip 1x1 "no cover" placeholders
 
+    /** The saved copy of a book's cover on disk, if it has been downloaded. */
+    fun savedFile(context: Context, url: String): File? =
+        File(File(context.filesDir, "covers"), hash(url)).takeIf { it.exists() && it.length() > 0 }
+
     private fun hash(url: String): String =
         MessageDigest.getInstance("SHA-1").digest(url.toByteArray()).joinToString("") { "%02x".format(it) }
 }

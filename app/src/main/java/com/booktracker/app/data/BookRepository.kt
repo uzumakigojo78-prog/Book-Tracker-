@@ -18,19 +18,27 @@ import java.util.UUID
 /**
  * Stores books as a JSON file in the app's private storage.
  */
-class BookRepository(context: Context) {
+class BookRepository private constructor(context: Context) {
 
-    private val file = File(context.filesDir, FILE_NAME)
+    private val appContext = context.applicationContext
+    private val file = File(appContext.filesDir, FILE_NAME)
+    private val loadLock = Mutex()
+    @Volatile private var loaded = false
     private val writeLock = Mutex()
     private val _books = MutableStateFlow<List<Book>>(emptyList())
     val books: StateFlow<List<Book>> = _books.asStateFlow()
 
-    suspend fun load() = withContext(Dispatchers.IO) {
-        _books.value = if (file.exists()) {
-            runCatching { decode(file.readText()) }.getOrDefault(emptyList())
-        } else {
-            emptyList()
+    /** Reads the library from disk once; later calls return straight away. */
+    suspend fun load() = loadLock.withLock {
+        if (loaded) return@withLock
+        withContext(Dispatchers.IO) {
+            _books.value = if (file.exists()) {
+                runCatching { decode(file.readText()) }.getOrDefault(emptyList())
+            } else {
+                emptyList()
+            }
         }
+        loaded = true
     }
 
     suspend fun addBook(details: BookDetails): String {
@@ -81,6 +89,8 @@ class BookRepository(context: Context) {
                 tmp.renameTo(file)
             }
         }
+        // Keep home-screen widgets in step with the app.
+        runCatching { com.booktracker.app.widget.BookWidget.refresh(appContext) }
     }
 
     private fun encode(books: List<Book>): String {
@@ -126,7 +136,13 @@ class BookRepository(context: Context) {
         }
     }
 
-    private companion object {
-        const val FILE_NAME = "books.json"
+    companion object {
+        private const val FILE_NAME = "books.json"
+
+        @Volatile private var instance: BookRepository? = null
+
+        /** The one shared library, used by the app, widgets and background backups. */
+        fun get(context: Context): BookRepository =
+            instance ?: synchronized(this) { instance ?: BookRepository(context).also { instance = it } }
     }
 }

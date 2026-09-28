@@ -4,6 +4,66 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.sharp.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.sharp.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.SwapVert
+import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.sharp.SwapVert
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.outlined.Widgets
+import androidx.compose.material.icons.rounded.Widgets
+import androidx.compose.material.icons.sharp.Widgets
+import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.sharp.Code
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.outlined.NewReleases
+import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.sharp.NewReleases
+import androidx.compose.material.icons.filled.NewReleases
+import androidx.compose.material.icons.outlined.Update
+import androidx.compose.material.icons.rounded.Update
+import androidx.compose.material.icons.sharp.Update
+import androidx.compose.material.icons.filled.Update
+import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.sharp.BugReport
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.sharp.Info
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.outlined.Colorize
+import androidx.compose.material.icons.rounded.Colorize
+import androidx.compose.material.icons.sharp.Colorize
+import androidx.compose.material.icons.filled.Colorize
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.sharp.ExpandMore
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.sharp.ExpandLess
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.material.icons.sharp.TaskAlt
+import androidx.compose.material.icons.filled.TaskAlt
+import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.sharp.Bookmark
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.rounded.AutoStories
+import androidx.compose.material.icons.sharp.AutoStories
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.sharp.Category
@@ -632,5 +692,125 @@ object AppIcons {
             IconStyle.ROUNDED -> Icons.AutoMirrored.Rounded.OpenInNew
             IconStyle.SHARP -> Icons.AutoMirrored.Sharp.OpenInNew
             IconStyle.FILLED -> Icons.AutoMirrored.Filled.OpenInNew
+        }
+
+    val KeyboardArrowUp: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.KeyboardArrowUp
+            IconStyle.ROUNDED -> Icons.Rounded.KeyboardArrowUp
+            IconStyle.SHARP -> Icons.Sharp.KeyboardArrowUp
+            IconStyle.FILLED -> Icons.Filled.KeyboardArrowUp
+        }
+
+    val KeyboardArrowDown: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.KeyboardArrowDown
+            IconStyle.ROUNDED -> Icons.Rounded.KeyboardArrowDown
+            IconStyle.SHARP -> Icons.Sharp.KeyboardArrowDown
+            IconStyle.FILLED -> Icons.Filled.KeyboardArrowDown
+        }
+
+    val SwapVert: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.SwapVert
+            IconStyle.ROUNDED -> Icons.Rounded.SwapVert
+            IconStyle.SHARP -> Icons.Sharp.SwapVert
+            IconStyle.FILLED -> Icons.Filled.SwapVert
+        }
+
+    val Widgets: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.Widgets
+            IconStyle.ROUNDED -> Icons.Rounded.Widgets
+            IconStyle.SHARP -> Icons.Sharp.Widgets
+            IconStyle.FILLED -> Icons.Filled.Widgets
+        }
+
+    val Code: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.Code
+            IconStyle.ROUNDED -> Icons.Rounded.Code
+            IconStyle.SHARP -> Icons.Sharp.Code
+            IconStyle.FILLED -> Icons.Filled.Code
+        }
+
+    val NewReleases: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.NewReleases
+            IconStyle.ROUNDED -> Icons.Rounded.NewReleases
+            IconStyle.SHARP -> Icons.Sharp.NewReleases
+            IconStyle.FILLED -> Icons.Filled.NewReleases
+        }
+
+    val Update: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.Update
+            IconStyle.ROUNDED -> Icons.Rounded.Update
+            IconStyle.SHARP -> Icons.Sharp.Update
+            IconStyle.FILLED -> Icons.Filled.Update
+        }
+
+    val BugReport: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.BugReport
+            IconStyle.ROUNDED -> Icons.Rounded.BugReport
+            IconStyle.SHARP -> Icons.Sharp.BugReport
+            IconStyle.FILLED -> Icons.Filled.BugReport
+        }
+
+    val Info: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.Info
+            IconStyle.ROUNDED -> Icons.Rounded.Info
+            IconStyle.SHARP -> Icons.Sharp.Info
+            IconStyle.FILLED -> Icons.Filled.Info
+        }
+
+    val Colorize: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.Colorize
+            IconStyle.ROUNDED -> Icons.Rounded.Colorize
+            IconStyle.SHARP -> Icons.Sharp.Colorize
+            IconStyle.FILLED -> Icons.Filled.Colorize
+        }
+
+    val ExpandMore: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.ExpandMore
+            IconStyle.ROUNDED -> Icons.Rounded.ExpandMore
+            IconStyle.SHARP -> Icons.Sharp.ExpandMore
+            IconStyle.FILLED -> Icons.Filled.ExpandMore
+        }
+
+    val ExpandLess: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.ExpandLess
+            IconStyle.ROUNDED -> Icons.Rounded.ExpandLess
+            IconStyle.SHARP -> Icons.Sharp.ExpandLess
+            IconStyle.FILLED -> Icons.Filled.ExpandLess
+        }
+
+    val TaskAlt: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.TaskAlt
+            IconStyle.ROUNDED -> Icons.Rounded.TaskAlt
+            IconStyle.SHARP -> Icons.Sharp.TaskAlt
+            IconStyle.FILLED -> Icons.Filled.TaskAlt
+        }
+
+    val Bookmark: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.Bookmark
+            IconStyle.ROUNDED -> Icons.Rounded.Bookmark
+            IconStyle.SHARP -> Icons.Sharp.Bookmark
+            IconStyle.FILLED -> Icons.Filled.Bookmark
+        }
+
+    val AutoStories: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.AutoStories
+            IconStyle.ROUNDED -> Icons.Rounded.AutoStories
+            IconStyle.SHARP -> Icons.Sharp.AutoStories
+            IconStyle.FILLED -> Icons.Filled.AutoStories
         }
 }

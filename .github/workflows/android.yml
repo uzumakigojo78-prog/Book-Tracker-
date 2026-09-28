@@ -68,4 +68,6 @@ jobs:
           files: BookTracker-*.apk
           make_latest: true
           body: |
+            ${{ github.event.head_commit.message }}
+
             Download **BookTracker-${{ env.VERSION_NAME }}.apk** below and open it on your Android phone to install.
