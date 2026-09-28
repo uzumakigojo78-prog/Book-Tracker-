@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.booktracker.app.MainActivity
 import com.booktracker.app.data.BuyLinks
 import com.booktracker.app.settings.LibrarySettings
 import com.booktracker.app.ui.theme.AppIcons
@@ -37,7 +38,8 @@ import com.booktracker.app.ui.theme.AppIcons
  */
 @Composable
 fun BuySection(title: String, author: String, modifier: Modifier = Modifier) {
-    val context = LocalContext.current.applicationContext
+    val activity = LocalContext.current
+    val context = activity.applicationContext
     val settings = remember { LibrarySettings(context) }
     val library by remember { settings.changes() }.collectAsState(initial = settings.read())
     val uri = LocalUriHandler.current
@@ -49,17 +51,23 @@ fun BuySection(title: String, author: String, modifier: Modifier = Modifier) {
         Text("Get this book", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
         val lib = library
-        if (lib != null) {
-            StoreTile(
-                AppIcons.LocalLibrary, "Check ${lib.name}",
-                if (lib.hasCatalog) "Search your library's catalog" else "Find it in libraries near you",
+        val catalog = lib?.catalogSearch(query)
+        when {
+            lib != null && catalog != null -> StoreTile(
+                AppIcons.LocalLibrary, "Check ${lib.name}", "See if it's on the shelf in the catalog",
                 c.tertiary, c.onTertiary, Modifier.fillMaxWidth(),
-            ) { uri.openUri(lib.catalogSearch(query)) }
-        } else {
-            StoreTile(
-                AppIcons.LocalLibrary, "Find it at a library", "Borrow it free · WorldCat",
+            ) { uri.openUri(catalog) }
+
+            // No catalog linked yet: the Library tab sets it up.
+            lib != null -> StoreTile(
+                AppIcons.LocalLibrary, "Check ${lib.name}", "Link its catalog in the Library tab",
                 c.tertiaryContainer, c.onTertiaryContainer, Modifier.fillMaxWidth(),
-            ) { uri.openUri(BuyLinks.worldCat(title, author)) }
+            ) { activity.startActivity(MainActivity.deepLink(activity, "library")) }
+
+            else -> StoreTile(
+                AppIcons.LocalLibrary, "Borrow it from your library", "Link your library in the Library tab",
+                c.tertiaryContainer, c.onTertiaryContainer, Modifier.fillMaxWidth(),
+            ) { activity.startActivity(MainActivity.deepLink(activity, "library")) }
         }
         Spacer(Modifier.height(8.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

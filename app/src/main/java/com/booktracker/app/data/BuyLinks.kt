@@ -22,10 +22,6 @@ object BuyLinks {
         )
     }
 
-    /** Libraries that have the book, near the reader (WorldCat asks for a location itself). */
-    fun worldCat(title: String, author: String): String =
-        "https://search.worldcat.org/search?q=${enc(listOf(title, author).filter { it.isNotBlank() }.joinToString(" "))}"
-
     /** Encodes for both query strings and path segments (spaces as %20, never +). */
     internal fun enc(s: String): String = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 }

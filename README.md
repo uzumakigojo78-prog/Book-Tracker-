@@ -35,11 +35,14 @@ indicators and springy motion.
   Project Gutenberg, and Google Books.
 - **Buy links on every book**: book pages, search results and recommendations link to Amazon,
   Barnes & Noble, Bookshop.org, Books-A-Million, Google Play Books, Kobo, ThriftBooks and
-  AbeBooks, plus "Check your library" (or WorldCat if you haven't linked one).
+  AbeBooks, plus "Check your library", which searches your library's own catalog so you see
+  what's actually on the shelf.
 - **Library tab, your library hub**: find your public library near you or by name, city or
   ZIP, then keep it all in one place: address, hours, website, directions and phone; your
   library card number (hidden until you tap, with copy); a sign-in link to your library
-  account; catalog search; your want-to-read list with one-tap "Check" at the library; and
+  account; search of your library's own catalog (found automatically from the library's website,
+  or paste its link; works with BiblioCommons, Polaris, Aspen, SirsiDynix, Koha, Evergreen,
+  Encore, Vega and any other catalog); your want-to-read list with one-tap "Check"; and
   Libby, Hoopla and Open Library for free ebooks and audiobooks. **Location is used only to
   look up libraries**: only when you tap "Find libraries near me", rounded to about 1 km,
   sent only to OpenStreetMap's library search, and never saved. Your library and card stay on

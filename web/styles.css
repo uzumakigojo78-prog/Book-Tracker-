@@ -532,3 +532,6 @@ a.btn { text-decoration: none; }
 @media (max-width: 400px) { .store-grid .store .ms { display: none; } .store-grid .store { padding: 12px 14px; } }
 .card-num.shown { white-space: normal; overflow-wrap: anywhere; }
 .lib-card .icon-btn { width: 44px; height: 44px; }
+.error-text { color: var(--error); }
+.catalog-host { margin-top: 6px; gap: 8px; }
+.catalog-host .btn.text { min-height: 40px; }
