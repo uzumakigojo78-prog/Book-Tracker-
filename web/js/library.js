@@ -20,8 +20,6 @@ export function buyLinks(title, author) {
   ];
 }
 
-export const worldCat = (title, author) => `https://search.worldcat.org/search?q=${enc(joinQ(title, author))}`;
-
 /* ---------- the reader's library ---------- */
 const KEY = 'booktracker.library';
 export const PLACEHOLDER = 'booktracker';
@@ -36,13 +34,67 @@ export const unlinkLibrary = () => store.remove(KEY);
 
 export const hasCatalog = (lib) => !!lib?.catalogUrl && (lib.catalogUrl.includes('{q}') || lib.catalogUrl.toLowerCase().includes(PLACEHOLDER));
 
-/** Search the library's own catalog, or WorldCat until the reader links it. */
+/** A search of the library's own catalog, once the reader has linked it (else null). */
 export function catalogSearch(lib, query) {
   const t = (lib?.catalogUrl || '').trim();
   const e = enc(query);
   if (t.includes('{q}')) return t.replaceAll('{q}', e);
   if (t.toLowerCase().includes(PLACEHOLDER)) return t.replace(new RegExp(PLACEHOLDER, 'gi'), e);
-  return `https://search.worldcat.org/search?q=${e}`;
+  return null;
+}
+
+/**
+ * A search address (with {q}) for any page of a known catalog system, or a results page
+ * for the word "booktracker". Null if we can't tell how to search it.
+ */
+export function catalogTemplate(input) {
+  const raw = (input || '').trim();
+  if (!raw) return null;
+  const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  if (url.includes('{q}') || url.toLowerCase().includes(PLACEHOLDER)) return url;
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  const host = u.hostname.toLowerCase();
+  const base = `${u.protocol}//${u.host}`;
+  const path = u.pathname;
+  const sirsi = path.match(/\/client\/([a-z]{2}_[A-Za-z]{2})\/([^/?#]+)/);
+  if (host.endsWith('bibliocommons.com')) return `${base}/v2/search?query={q}&searchType=smart`;
+  if (host.includes('iiivega.com')) return `${base}/search?query={q}&searchType=everything`;
+  if (/\/polaris/i.test(path)) return `${base}/polaris/search/searchresults.aspx?ctx=1.1033.0.0.1&type=Keyword&term={q}`;
+  if (/\/cgi-bin\/koha/i.test(path)) return `${base}/cgi-bin/koha/opac-search.pl?q={q}`;
+  if (/\/eg\/opac/i.test(path)) return `${base}/eg/opac/results?query={q}&qtype=keyword`;
+  if (/\/iii\/encore/i.test(path)) return `${base}/iii/encore/search/C__S{q}__Orightresult`;
+  if (sirsi) return `${base}/client/${sirsi[1]}/${sirsi[2]}/search/results?qu={q}`;
+  if (host.includes('aspendiscovery') || /\/Search\/Results|\/GroupedWork\//i.test(path)) return `${base}/Search/Results?lookfor={q}&searchIndex=Keyword`;
+  return null;
+}
+
+/** Looks through a library website's links for its catalog. */
+export function findCatalogInHtml(html, pageUrl) {
+  for (const m of html.matchAll(/href\s*=\s*["']([^"'#][^"']*)["']/gi)) {
+    const href = m[1].replaceAll('&amp;', '&').trim();
+    if (!/^https?:|^\//i.test(href)) continue;
+    let abs;
+    try { abs = new URL(href, pageUrl).toString(); } catch { continue; }
+    if (abs.toLowerCase().includes(PLACEHOLDER) || abs.includes('{q}')) continue;
+    const t = catalogTemplate(abs);
+    if (t) return t;
+  }
+  return null;
+}
+
+/** Finds the catalog from the library's website (browsers often block reading other sites; then null). */
+export async function detectCatalog(website) {
+  const direct = catalogTemplate(website);
+  if (direct) return direct;
+  try {
+    const url = /^https?:/i.test(website) ? website : `https://${website}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout?.(10000) });
+    if (!res.ok) return null;
+    return catalogTemplate(res.url) || findCatalogInHtml(await res.text(), res.url || url);
+  } catch {
+    return null;
+  }
 }
 
 const withScheme = (u) => (/^https?:\/\//i.test(u) ? u : `https://${u}`);

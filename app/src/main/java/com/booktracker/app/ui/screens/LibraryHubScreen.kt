@@ -46,6 +46,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.booktracker.app.data.Book
+import com.booktracker.app.data.Catalogs
 import com.booktracker.app.data.Library
 import com.booktracker.app.data.LibraryFinder
 import com.booktracker.app.settings.LibrarySettings
@@ -328,7 +330,21 @@ private fun LibraryHubContent(
     val wanted = books.filter { it.section() == BookSection.WANT }
 
     fun searchCatalog() {
-        if (search.isNotBlank()) uri.openUri(lib.catalogSearch(search.trim()))
+        if (search.isNotBlank()) lib.catalogSearch(search.trim())?.let(uri::openUri)
+    }
+
+    // Most libraries link their catalog from their website: look for it once.
+    var detecting by remember { mutableStateOf(false) }
+    var detectedFor by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(lib.website, lib.hasCatalog) {
+        val site = lib.websiteLink
+        if (!lib.hasCatalog && site != null && detectedFor != site) {
+            detecting = true
+            val found = Catalogs.detect(site)
+            detecting = false
+            detectedFor = site
+            if (found != null) onSave(lib.copy(catalogUrl = found))
+        }
     }
 
     LazyColumn(
@@ -415,33 +431,41 @@ private fun LibraryHubContent(
             }
         }
 
-        // Catalog search.
+        // Catalog search: the library's own catalog shows what's on the shelf right now.
         item {
             SectionCard(title = "Search the catalog") {
-                OutlinedTextField(
-                    value = search,
-                    onValueChange = { search = it },
-                    label = { Text("Title, author or topic") },
-                    leadingIcon = { Icon(AppIcons.Search, null) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { searchCatalog() }),
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(10.dp))
-                FilledTonalButton(onClick = { searchCatalog() }, enabled = search.isNotBlank(), modifier = Modifier.fillMaxWidth().height(50.dp)) {
-                    Icon(AppIcons.Search, null)
-                    Spacer(Modifier.width(8.dp))
-                    ButtonText(if (lib.hasCatalog) "Search ${lib.name}" else "Search libraries (WorldCat)")
-                }
-                if (!lib.hasCatalog) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Tip: add your library's catalog in \"Edit card & account links\" to search it directly.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.onSurfaceVariant,
+                if (lib.hasCatalog) {
+                    OutlinedTextField(
+                        value = search,
+                        onValueChange = { search = it },
+                        label = { Text("Title, author or topic") },
+                        leadingIcon = { Icon(AppIcons.Search, null) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { searchCatalog() }),
+                        shape = MaterialTheme.shapes.large,
+                        modifier = Modifier.fillMaxWidth(),
                     )
+                    Spacer(Modifier.height(10.dp))
+                    FilledTonalButton(onClick = { searchCatalog() }, enabled = search.isNotBlank(), modifier = Modifier.fillMaxWidth().height(50.dp)) {
+                        Icon(AppIcons.Search, null)
+                        Spacer(Modifier.width(8.dp))
+                        ButtonText("Search ${lib.name}")
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Catalog: " + (runCatching { java.net.URI(lib.catalogUrl).host }.getOrNull() ?: lib.catalogUrl),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { onSave(lib.copy(catalogUrl = "")) }) { Text("Change") }
+                    }
+                } else {
+                    CatalogSetup(lib, detecting, onLinked = { onSave(lib.copy(catalogUrl = it)) })
                 }
             }
         }
@@ -449,6 +473,14 @@ private fun LibraryHubContent(
         // The reader's want-to-read list, one tap to check each at the library.
         item {
             SectionCard(title = "Want to read") {
+                if (wanted.isNotEmpty() && !lib.hasCatalog) {
+                    Text(
+                        "Link your library's catalog above to check which of these are on the shelf.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = c.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
                 if (wanted.isEmpty()) {
                     Text(
                         "Books you add but haven't started show up here, so you can check if your library has them.",
@@ -471,9 +503,13 @@ private fun LibraryHubContent(
                                     }
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                FilledTonalButton(onClick = {
-                                    uri.openUri(lib.catalogSearch(listOf(book.title, book.author).filter { it.isNotBlank() }.joinToString(" ")))
-                                }) { Text("Check") }
+                                FilledTonalButton(
+                                    onClick = {
+                                        lib.catalogSearch(listOf(book.title, book.author).filter { it.isNotBlank() }.joinToString(" "))
+                                            ?.let(uri::openUri)
+                                    },
+                                    enabled = lib.hasCatalog,
+                                ) { Text("Check") }
                             }
                         }
                     }
@@ -551,6 +587,72 @@ private fun LibraryHubContent(
     }
 }
 
+/** Links the library's catalog: found automatically, or pasted from the library's website. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CatalogSetup(lib: Library, detecting: Boolean, onLinked: (String) -> Unit) {
+    val uri = LocalUriHandler.current
+    val c = MaterialTheme.colorScheme
+    var address by rememberSaveable { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    fun link() {
+        val template = Catalogs.template(address)
+        if (template == null) error = true else { error = false; address = ""; onLinked(template) }
+    }
+
+    if (detecting) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            LoadingIndicator(Modifier.size(36.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("Looking for the catalog on ${lib.name}'s website…", style = MaterialTheme.typography.bodyLarge)
+        }
+        return
+    }
+    Text(
+        "Link ${lib.name}'s online catalog to search what's on the shelf and see if books are in stock.",
+        style = MaterialTheme.typography.bodyLarge,
+    )
+    Spacer(Modifier.height(12.dp))
+    lib.websiteLink?.let { site ->
+        OutlinedButton(onClick = { uri.openUri(site) }, modifier = Modifier.fillMaxWidth().height(50.dp)) {
+            Icon(AppIcons.Language, null)
+            Spacer(Modifier.width(8.dp))
+            ButtonText("Open ${lib.name}'s website")
+        }
+        Spacer(Modifier.height(10.dp))
+    }
+    OutlinedTextField(
+        value = address,
+        onValueChange = { address = it.trim(); error = false },
+        label = { Text("Catalog address") },
+        placeholder = { Text("Paste the catalog's link") },
+        leadingIcon = { Icon(AppIcons.Link, null) },
+        singleLine = true,
+        isError = error,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { link() }),
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.height(10.dp))
+    Button(onClick = { link() }, enabled = address.isNotBlank(), modifier = Modifier.fillMaxWidth().height(50.dp)) {
+        Icon(AppIcons.CheckCircle, null)
+        Spacer(Modifier.width(8.dp))
+        ButtonText("Link catalog")
+    }
+    Spacer(Modifier.height(8.dp))
+    Text(
+        if (error) {
+            "Couldn't tell how to search that catalog. On the catalog, search for the word \"${Library.PLACEHOLDER}\" and paste that results page's link."
+        } else {
+            "On your library's website, open the catalog (often \"Catalog\" or \"Search\") and paste its link. Works with BiblioCommons, " +
+                "Polaris, Aspen, SirsiDynix, Koha, Evergreen, Encore and Vega. Any other catalog: search it for \"${Library.PLACEHOLDER}\" and paste that page."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = if (error) c.error else c.onSurfaceVariant,
+    )
+}
+
 @Composable
 private fun LibraryDetailsDialog(initial: Library, title: String, onDismiss: () -> Unit, onSave: (Library) -> Unit) {
     var name by remember { mutableStateOf(initial.name) }
@@ -587,8 +689,8 @@ private fun LibraryDetailsDialog(initial: Library, title: String, onDismiss: () 
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    "To link the catalog: on your library's website, search for the word \"${Library.PLACEHOLDER}\", then copy that " +
-                        "page's address here. Book Tracker swaps in whatever you search for.",
+                    "Paste your library's catalog link. If it isn't recognised, search the catalog for the word " +
+                        "\"${Library.PLACEHOLDER}\" and paste that results page instead.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -602,7 +704,7 @@ private fun LibraryDetailsDialog(initial: Library, title: String, onDismiss: () 
                             name = name.trim().ifBlank { initial.name.ifBlank { "My library" } },
                             cardNumber = card,
                             accountUrl = account,
-                            catalogUrl = catalog,
+                            catalogUrl = Catalogs.template(catalog) ?: catalog,
                             website = website.ifBlank { null },
                         ),
                     )

@@ -16,7 +16,7 @@ import { mountColorWheel } from './js/colorwheel.js';
 import { GENRES, PROVIDERS, aiSettings, analyzeWithAi, getConfig, librarySignature, providerById } from './js/ai.js';
 import {
   accountLink, buyLinks, catalogSearch as librarySearch, formatDistance, hasCatalog, librariesNear, mapLink, myLibrary,
-  PLACEHOLDER, roughLocation, saveLibrary, searchLibraries, unlinkLibrary, websiteLink, worldCat,
+  PLACEHOLDER, catalogTemplate, detectCatalog, roughLocation, saveLibrary, searchLibraries, unlinkLibrary, websiteLink,
 } from './js/library.js';
 import { analyzeBasic, catalogDetails, catalogGenres, catalogSearch, copiesFrom, findCopies, searchBooks } from './js/lookup.js';
 
@@ -937,9 +937,12 @@ function storeTile(ic, name, note, url, cls = '') {
 function buySection(title, author) {
   const lib = myLibrary();
   const q = [title, author].filter(Boolean).join(' ');
-  const libTile = lib
-    ? storeTile('local_library', `Check ${esc(lib.name)}`, hasCatalog(lib) ? "Search your library's catalog" : 'Find it in libraries near you', librarySearch(lib, q), 'lib-tile')
-    : storeTile('local_library', 'Find it at a library', 'Borrow it free · WorldCat', worldCat(title, author), 'lib-tile soft');
+  const catalog = librarySearch(lib, q);
+  // Without a linked catalog, the tile opens the Library tab to set it up.
+  const libTile = lib && catalog
+    ? storeTile('local_library', `Check ${esc(lib.name)}`, "See if it's on the shelf in the catalog", catalog, 'lib-tile')
+    : `<a class="store lib-tile soft" href="#/library">${icon('local_library')}<span class="grow"><span class="store-name">${lib ? `Check ${esc(lib.name)}` : 'Borrow it from your library'}</span>
+        <span class="body-s">${lib ? 'Link its catalog in the Library tab' : 'Link your library in the Library tab'}</span></span></a>`;
   const stores = buyLinks(title, author).map((st) => {
     const featured = st.id === 'amazon' || st.id === 'bn';
     return storeTile(featured ? 'shopping_cart' : 'storefront', esc(st.name), esc(st.note), st.url, featured ? 'featured' : '');
@@ -950,7 +953,11 @@ function buySection(title, author) {
 
 /* ---------- Library tab ---------- */
 // The finder's state survives re-renders (e.g. switching tabs and back).
-const hub = { changing: false, results: null, loading: false, message: '', query: '', showCard: false, search: '' };
+const hub = {
+  changing: false, results: null, loading: false, message: '', query: '', showCard: false, search: '',
+  detecting: false, detectedFor: null, catalogAddress: '', catalogError: false,
+};
+const hostOf = (url) => { try { return new URL(url.replace('{q}', 'q')).host; } catch { return url; } };
 
 function renderLibraryHub(dir) {
   const lib = myLibrary();
@@ -992,21 +999,36 @@ function renderLibraryHub(dir) {
 
     <div class="panel">
       <h3 class="headline-s" style="margin:0 0 14px">Search the catalog</h3>
-      <form data-catalog>
+      ${hasCatalog(lib) ? `<form data-catalog>
         <label class="field search-field" style="margin-bottom:0">
           <input type="search" data-catalog-q value="${esc(hub.search)}" placeholder="Title, author or topic" enterkeyhint="search" autocomplete="off">${icon('search', 'lead')}
         </label>
-        <button class="btn big filled" type="submit">${icon('search')}${hasCatalog(lib) ? `Search ${esc(lib.name)}` : 'Search libraries (WorldCat)'}</button>
+        <button class="btn big filled" type="submit">${icon('search')}Search ${esc(lib.name)}</button>
       </form>
-      ${hasCatalog(lib) ? '' : '<p class="body-s muted" style="margin:10px 4px 0">Tip: add your library\'s catalog in "Edit card & account links" to search it directly.</p>'}
+      <div class="row catalog-host"><span class="grow body-s muted">Catalog: ${esc(hostOf(lib.catalogUrl))}</span><button class="btn text" data-change-catalog>Change</button></div>`
+      : hub.detecting ? `<div class="row"><div class="loader small"></div><span class="body-l">Looking for the catalog on ${esc(lib.name)}'s website…</span></div>`
+        : `<p class="body-l" style="margin:0 0 12px">Link ${esc(lib.name)}'s online catalog to search what's on the shelf and see if books are in stock.</p>
+        ${site ? `<a class="btn big outline" href="${esc(site)}" target="_blank" rel="noopener">${icon('language')}Open ${esc(lib.name)}'s website</a>` : ''}
+        <form data-link-catalog class="stack" style="margin-top:12px">
+          <label class="field ${hub.catalogError ? 'error' : ''}">
+            <input data-catalog-address type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder=" " value="${esc(hub.catalogAddress)}">
+            <span class="lbl">Catalog address</span>${icon('link', 'lead')}
+          </label>
+          <button class="btn big filled" type="submit">${icon('check_circle')}Link catalog</button>
+        </form>
+        <p class="body-s ${hub.catalogError ? 'error-text' : 'muted'}" style="margin:10px 4px 0">${hub.catalogError
+          ? `Couldn't tell how to search that catalog. On the catalog, search for the word "${PLACEHOLDER}" and paste that results page's link.`
+          : `On your library's website, open the catalog (often "Catalog" or "Search") and paste its link. Works with BiblioCommons, Polaris, Aspen, SirsiDynix, Koha, Evergreen, Encore and Vega. Any other catalog: search it for "${PLACEHOLDER}" and paste that page.`}</p>`}
     </div>
 
     <div class="panel">
       <h3 class="headline-s" style="margin:0 0 14px">Want to read</h3>
+      ${wanted.length && !hasCatalog(lib) ? '<p class="body-m muted" style="margin:0 0 12px">Link your library\'s catalog above to check which of these are on the shelf.</p>' : ''}
       ${wanted.length ? `<div class="stack">${wanted.map((b) => `<div class="row want-row">
           ${badge(b, colorIndex(b), 'small')}
           <a class="grow want-title" href="#/book/${esc(b.id)}"><span class="title-m block">${esc(b.title)}</span>${b.author ? `<span class="body-m muted block">${esc(b.author)}</span>` : ''}</a>
-          <a class="btn tonal" href="${esc(librarySearch(lib, bookQuery(b)))}" target="_blank" rel="noopener">Check</a></div>`).join('')}</div>`
+          ${hasCatalog(lib) ? `<a class="btn tonal" href="${esc(librarySearch(lib, bookQuery(b)))}" target="_blank" rel="noopener">Check</a>`
+            : '<button class="btn tonal" disabled>Check</button>'}</div>`).join('')}</div>`
         : '<p class="body-l muted" style="margin:0">Books you add but haven\'t started show up here, so you can check if your library has them.</p>'}
     </div>
 
@@ -1033,12 +1055,44 @@ function renderLibraryHub(dir) {
   });
   app.querySelector('[data-edit-lib]').onclick = () => editLibrary(lib, () => renderLibraryHub('none'));
   const qInput = app.querySelector('[data-catalog-q]');
-  qInput.oninput = () => { hub.search = qInput.value; };
-  app.querySelector('[data-catalog]').onsubmit = (e) => {
-    e.preventDefault();
-    const q = qInput.value.trim();
-    if (q) window.open(librarySearch(lib, q), '_blank', 'noopener');
-  };
+  if (qInput) {
+    qInput.oninput = () => { hub.search = qInput.value; };
+    app.querySelector('[data-catalog]').onsubmit = (e) => {
+      e.preventDefault();
+      const q = qInput.value.trim();
+      if (q) window.open(librarySearch(lib, q), '_blank', 'noopener');
+    };
+  }
+  app.querySelector('[data-change-catalog]')?.addEventListener('click', () => {
+    saveLibrary({ ...lib, catalogUrl: '' });
+    renderLibraryHub('none');
+  });
+  const address = app.querySelector('[data-catalog-address]');
+  if (address) {
+    address.oninput = () => { hub.catalogAddress = address.value; };
+    app.querySelector('[data-link-catalog]').onsubmit = (e) => {
+      e.preventDefault();
+      const template = catalogTemplate(address.value);
+      hub.catalogError = !template;
+      if (template) {
+        hub.catalogAddress = '';
+        saveLibrary({ ...lib, catalogUrl: template });
+        toast('Catalog linked');
+      }
+      renderLibraryHub('none');
+    };
+  }
+  // Most libraries link their catalog from their website: look for it once per site.
+  if (!hasCatalog(lib) && site && hub.detectedFor !== site && !hub.detecting) {
+    hub.detecting = true;
+    detectCatalog(site).then((found) => {
+      hub.detecting = false;
+      hub.detectedFor = site;
+      const now = myLibrary();
+      if (found && now && !hasCatalog(now)) { saveLibrary({ ...now, catalogUrl: found }); toast('Found your library\'s catalog'); }
+      if (location.hash.startsWith('#/library')) renderLibraryHub('none');
+    });
+  }
   app.querySelector('[data-change-lib]').onclick = () => { hub.changing = true; hub.results = null; hub.message = ''; renderLibraryHub('none'); };
   app.querySelector('[data-unlink]').onclick = async () => {
     const ok = await confirmDialog({ title: `Unlink ${lib.name}?`, text: 'Your saved card number and links for this library will be removed from this device.', confirm: 'Unlink', danger: true });
@@ -1130,7 +1184,7 @@ function editLibrary(lib, onSaved) {
       ${field('website', 'Library website', 'language', lib.website, 'text', 'inputmode="url" autocapitalize="off"')}
       ${field('accountUrl', 'Account sign-in page', 'person', lib.accountUrl, 'text', 'inputmode="url" autocapitalize="off"')}
       ${field('catalogUrl', 'Catalog search link', 'search', lib.catalogUrl, 'text', 'inputmode="url" autocapitalize="off"')}
-      <p class="body-s muted" style="margin:0 4px">To link the catalog: on your library's website, search for the word "${PLACEHOLDER}", then copy that page's address here. Book Tracker swaps in whatever you search for.</p>
+      <p class="body-s muted" style="margin:0 4px">Paste your library's catalog link. If it isn't recognised, search the catalog for the word "${PLACEHOLDER}" and paste that results page instead.</p>
       <button class="btn big filled" type="submit">${icon('save')}Save</button>
     </form>`);
   body.querySelector('[data-lib-form]').onsubmit = (e) => {
@@ -1138,7 +1192,7 @@ function editLibrary(lib, onSaved) {
     const v = (k) => body.querySelector(`[data-f="${k}"]`).value.trim();
     const name = v('name');
     if (!name) return;
-    saveLibrary({ ...lib, name, cardNumber: v('cardNumber'), website: v('website') || null, accountUrl: v('accountUrl'), catalogUrl: v('catalogUrl') });
+    saveLibrary({ ...lib, name, cardNumber: v('cardNumber'), website: v('website') || null, accountUrl: v('accountUrl'), catalogUrl: catalogTemplate(v('catalogUrl')) || v('catalogUrl') });
     closeSheet();
     toast('Library saved');
     onSaved();

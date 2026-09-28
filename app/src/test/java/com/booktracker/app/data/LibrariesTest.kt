@@ -24,7 +24,6 @@ class BuyLinksTest {
     fun encodesAwkwardTitles() {
         val url = BuyLinks.forBook("Harry Potter & the Philosopher's Stone", "").first { it.id == "amazon" }.url
         assertTrue(url, url.contains("Harry%20Potter%20%26%20the%20Philosopher%27s%20Stone&"))
-        assertEquals("https://search.worldcat.org/search?q=Emma%20Jane%20Austen", BuyLinks.worldCat("Emma", "Jane Austen"))
     }
 }
 
@@ -38,7 +37,7 @@ class LibrariesTest {
         assertEquals("https://x.org/s/Dune", braces.catalogSearch("Dune"))
         val none = Library("Y")
         assertFalse(none.hasCatalog)
-        assertEquals("https://search.worldcat.org/search?q=Dune", none.catalogSearch("Dune"))
+        assertNull(none.catalogSearch("Dune"))
     }
 
     @Test
@@ -108,5 +107,49 @@ class LibrariesTest {
         assertEquals("https://www.bpl.org", libs[0].website)
         assertEquals(42.349, libs[0].lat!!, 1e-9)
         assertNull(libs[0].distanceKm)
+    }
+}
+
+class CatalogsTest {
+    private fun t(url: String) = Catalogs.template(url)
+
+    @Test
+    fun recognisesCommonCatalogSystems() {
+        assertEquals("https://nypl.bibliocommons.com/v2/search?query={q}&searchType=smart", t("https://nypl.bibliocommons.com/v2/recentlyreturned"))
+        assertEquals("https://catalog.lib.org/polaris/search/searchresults.aspx?ctx=1.1033.0.0.1&type=Keyword&term={q}", t("catalog.lib.org/polaris/default.aspx"))
+        assertEquals("https://opac.lib.org/cgi-bin/koha/opac-search.pl?q={q}", t("https://opac.lib.org/cgi-bin/koha/opac-main.pl"))
+        assertEquals("https://ev.lib.org/eg/opac/results?query={q}&qtype=keyword", t("https://ev.lib.org/eg/opac/home"))
+        assertEquals("https://browse.lib.org/iii/encore/search/C__S{q}__Orightresult", t("https://browse.lib.org/iii/encore/home"))
+        assertEquals("https://lib.na.iiivega.com/search?query={q}&searchType=everything", t("https://lib.na.iiivega.com/"))
+        assertEquals("https://sd.lib.org/client/en_US/default/search/results?qu={q}", t("https://sd.lib.org/client/en_US/default/?rm=HOME"))
+        assertEquals("https://town.aspendiscovery.org/Search/Results?lookfor={q}&searchIndex=Keyword", t("https://town.aspendiscovery.org/"))
+        assertEquals("https://catalog.town.org/Search/Results?lookfor={q}&searchIndex=Keyword", t("https://catalog.town.org/GroupedWork/abc/Home"))
+        assertNull(t("https://www.townlibrary.org/about"))
+        assertNull(t(""))
+    }
+
+    @Test
+    fun keepsPlaceholderPages() {
+        val url = "https://cat.example.org/search?term=booktracker&x=1"
+        assertEquals(url, t(url))
+        val lib = Library("L", catalogUrl = t(url)!!)
+        assertEquals("https://cat.example.org/search?term=Dune&x=1", lib.catalogSearch("Dune"))
+        val biblio = Library("B", catalogUrl = t("https://x.bibliocommons.com")!!)
+        assertEquals("https://x.bibliocommons.com/v2/search?query=Project%20Hail%20Mary&searchType=smart", biblio.catalogSearch("Project Hail Mary"))
+    }
+
+    @Test
+    fun findsTheCatalogLinkOnALibraryWebsite() {
+        val html = """
+            <a href="/about">About</a><a href="https://facebook.com/lib">FB</a>
+            <a class="nav" href='https://springfield.bibliocommons.com/v2/search?query=&amp;searchType=smart'>Catalog</a>
+            <a href="https://other.polaris.org/polaris/">Other</a>
+        """
+        assertEquals("https://springfield.bibliocommons.com/v2/search?query={q}&searchType=smart", Catalogs.findInHtml(html, "https://springfieldlibrary.org/"))
+        assertEquals(
+            "https://lib.org/polaris/search/searchresults.aspx?ctx=1.1033.0.0.1&type=Keyword&term={q}",
+            Catalogs.findInHtml("<a href=\"/polaris/default.aspx\">Search</a>", "https://lib.org/home"),
+        )
+        assertNull(Catalogs.findInHtml("<a href=\"/events\">Events</a>", "https://lib.org/"))
     }
 }

@@ -30,19 +30,19 @@ data class Library(
     /** Where the reader signs in to their account (holds, loans, fines). */
     val accountUrl: String = "",
     /**
-     * A catalog search address. The word "booktracker" (or "{q}") is replaced with
-     * what to search for, so any library's catalog works.
+     * The library's catalog search address. "{q}" (or the word "booktracker") is replaced
+     * with what to search for.
      */
     val catalogUrl: String = "",
 ) {
-    /** Search this library's catalog, or WorldCat if we don't know how yet. */
-    fun catalogSearch(query: String): String {
+    /** A search of this library's own catalog, once the reader has linked it. */
+    fun catalogSearch(query: String): String? {
         val template = catalogUrl.trim()
         val e = BuyLinks.enc(query)
         return when {
             template.contains("{q}") -> template.replace("{q}", e)
             template.contains(PLACEHOLDER, ignoreCase = true) -> template.replace(Regex(PLACEHOLDER, RegexOption.IGNORE_CASE), e)
-            else -> "https://search.worldcat.org/search?q=$e"
+            else -> null
         }
     }
 
