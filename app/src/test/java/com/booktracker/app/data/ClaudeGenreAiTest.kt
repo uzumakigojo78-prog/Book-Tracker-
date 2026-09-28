@@ -2,7 +2,11 @@ package com.booktracker.app.data
 
 import com.booktracker.app.ai.AiException
 import com.booktracker.app.ai.AnalysisSource
+import com.booktracker.app.ai.AiConfig
+import com.booktracker.app.ai.AiProvider
 import com.booktracker.app.ai.ClaudeGenreAi
+import com.booktracker.app.ai.GenrePrompt
+import com.booktracker.app.ai.OpenAiCompatibleAi
 import com.booktracker.app.ai.GenreAnalysis
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -34,7 +38,7 @@ class ClaudeGenreAiTest {
 
     @Test
     fun parsesReplyAndNormalizesGenres() {
-        val a = ClaudeGenreAi.parseAnalysis(reply, books, "sig", 42L)
+        val a = GenrePrompt.parseAnalysis(reply, books, "sig", 42L)
         assertEquals(AnalysisSource.AI, a.source)
         assertEquals(listOf("Fantasy", "Adventure"), a.bookGenres["b1"])
         assertEquals(listOf("Science Fiction"), a.bookGenres["b2"])
@@ -49,7 +53,7 @@ class ClaudeGenreAiTest {
 
     @Test(expected = AiException::class)
     fun rejectsNonJson() {
-        ClaudeGenreAi.parseAnalysis("Sorry, I can't help.", books, "sig", 0L)
+        GenrePrompt.parseAnalysis("Sorry, I can't help.", books, "sig", 0L)
     }
 
     @Test
@@ -62,7 +66,7 @@ class ClaudeGenreAiTest {
             .toString()
         val server = OneShotHttpServer(message)
         val result = runBlocking {
-            ClaudeGenreAi("sk-test", "http://127.0.0.1:${server.port}").analyze(books, "sig")
+            ClaudeGenreAi("sk-test", baseUrl = "http://127.0.0.1:${server.port}").analyze(books, "sig")
         }
         server.join()
         val sent = JSONObject(server.body)
@@ -73,6 +77,43 @@ class ClaudeGenreAiTest {
         assertEquals("sk-test", server.headers["x-api-key"])
         assertTrue(sent.getJSONArray("messages").getJSONObject(0).toString().contains("The Hobbit"))
         assertEquals(2, result.recommendations.size)
+        assertEquals("Claude Opus 5", result.madeBy)
+    }
+
+    @Test
+    fun sendsOpenAiCompatibleRequest() {
+        val completion = JSONObject()
+            .put("id", "chatcmpl-1").put("object", "chat.completion")
+            .put("choices", org.json.JSONArray().put(JSONObject().put("index", 0)
+                .put("message", JSONObject().put("role", "assistant").put("content", reply))
+                .put("finish_reason", "stop")))
+            .toString()
+        val server = OneShotHttpServer(completion)
+        val config = AiConfig(AiProvider.GEMINI, "AIza-test-key", "gemini-2.5-flash", "http://127.0.0.1:${server.port}/v1beta/openai/")
+        val result = runBlocking { OpenAiCompatibleAi(config).analyze(books, "sig") }
+        server.join()
+        val sent = JSONObject(server.body)
+        assertEquals("/v1beta/openai/chat/completions", server.path)
+        assertEquals("Bearer AIza-test-key", server.headers["authorization"])
+        assertEquals("gemini-2.5-flash", sent.getString("model"))
+        assertEquals("system", sent.getJSONArray("messages").getJSONObject(0).getString("role"))
+        assertTrue(sent.getJSONArray("messages").getJSONObject(1).getString("content").contains("The Hobbit"))
+        assertEquals(2, result.recommendations.size)
+        assertEquals("Gemini · gemini-2.5-flash", result.madeBy)
+    }
+
+    @Test
+    fun explainsProviderErrors() {
+        assertEquals(
+            "Grok rejected the API key. Check it in Settings → AI.",
+            OpenAiCompatibleAi.errorMessage("Grok", 401, "{}"),
+        )
+        assertEquals(
+            "Kimi returned an error (500): model overloaded",
+            OpenAiCompatibleAi.errorMessage("Kimi", 500, """{"error":{"message":"model overloaded"}}"""),
+        )
+        // Content as a list of text parts.
+        assertEquals("ab", OpenAiCompatibleAi.replyText("""{"choices":[{"message":{"content":[{"type":"text","text":"a"},{"type":"text","text":"b"}]}}]}"""))
     }
 }
 

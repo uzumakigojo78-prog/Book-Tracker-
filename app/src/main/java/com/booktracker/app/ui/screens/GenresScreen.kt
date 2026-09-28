@@ -46,7 +46,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.booktracker.app.ai.AnalysisSource
-import com.booktracker.app.ai.ClaudeGenreAi
+import com.booktracker.app.ai.AiConfig
+import com.booktracker.app.ai.AiProvider
 import com.booktracker.app.ai.GENRES
 import com.booktracker.app.ai.GenreViewModel
 import com.booktracker.app.ai.OnlineCopies
@@ -73,8 +74,8 @@ fun GenresScreen(
     val analysis by vm.analysis.collectAsStateWithLifecycle()
     val running by vm.running.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
-    val apiKey by vm.apiKey.collectAsStateWithLifecycle()
-    val hasAi = apiKey != null
+    val aiConfig by vm.aiConfig.collectAsStateWithLifecycle()
+    val hasAi = aiConfig != null
     val outdated = analysis != null && analysis?.librarySignature != librarySignature(books)
     var sheetFor by remember { mutableStateOf<Pair<String, String>?>(null) }
 
@@ -115,11 +116,12 @@ fun GenresScreen(
 
         item {
             ModeCard(
-                hasAi = hasAi,
+                ai = aiConfig,
                 running = running,
                 hasResult = analysis != null,
                 outdated = outdated,
                 source = analysis?.source,
+                madeBy = analysis?.madeBy,
                 onAnalyze = { vm.analyze(books) },
                 onSetUpAi = onSetUpAi,
             )
@@ -192,15 +194,18 @@ private const val UNSORTED = "Not sorted yet"
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ModeCard(
-    hasAi: Boolean,
+    ai: AiConfig?,
     running: Boolean,
     hasResult: Boolean,
     outdated: Boolean,
     source: AnalysisSource?,
+    madeBy: String?,
     onAnalyze: () -> Unit,
     onSetUpAi: () -> Unit,
 ) {
     val c = MaterialTheme.colorScheme
+    val hasAi = ai != null
+    val name = if (ai != null && ai.provider != AiProvider.CUSTOM) ai.provider.label else "The AI"
     SectionCard(color = if (hasAi) c.secondaryContainer else c.surfaceContainerHigh) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -209,16 +214,17 @@ private fun ModeCard(
             ) { Icon(if (hasAi) AppIcons.Psychology else AppIcons.Category, null, tint = if (hasAi) c.onSecondary else c.surface) }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(if (hasAi) "AI: ${ClaudeGenreAi.MODEL_NAME}" else "Basic mode", style = MaterialTheme.typography.titleLarge)
+                Text(if (ai != null) "AI: ${ai.displayName}" else "Basic mode", style = MaterialTheme.typography.titleLarge)
                 Text(
                     when {
-                        running && hasAi -> "Claude is reading your library…"
+                        running && hasAi -> "$name is reading your library…"
                         running -> "Sorting your books…"
-                        hasAi && source == AnalysisSource.BASIC -> "Showing basic results. Tap Analyze for Claude's take."
-                        hasAi && !hasResult -> "Tap Analyze to let Claude sort your books and pick what to read next."
+                        hasAi && source == AnalysisSource.BASIC -> "Showing basic results. Tap Analyze for $name's take."
+                        hasAi && !hasResult -> "Tap Analyze to let $name sort your books and pick what to read next."
                         outdated && hasAi -> "Your library changed since the last analysis."
-                        hasAi -> "Genres and picks by Claude."
-                        else -> "Genres from Open Library. Add an Anthropic API key for AI genres and personal picks."
+                        hasAi && madeBy != null && madeBy != ai?.displayName -> "Last analysis by $madeBy. Tap Re-analyze to use $name."
+                        hasAi -> "Genres and picks by $name."
+                        else -> "Genres from Open Library. Add an AI API key (Claude, Gemini, Grok, Kimi and more) for AI genres and personal picks."
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = c.onSurfaceVariant,

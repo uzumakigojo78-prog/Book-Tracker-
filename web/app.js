@@ -12,7 +12,7 @@ import {
   CORNERS, FONTS, ICON_STYLES, PALETTES, TEXT_SIZES, THEME_MODES, appearance, applyAppearance, isDark,
   loadFonts, paletteSwatch, setAppearance,
 } from './js/theme.js';
-import { GENRES, MODEL_NAME, analyzeWithClaude, getApiKey, librarySignature, setApiKey } from './js/ai.js';
+import { GENRES, PROVIDERS, aiSettings, analyzeWithAi, getConfig, librarySignature, providerById } from './js/ai.js';
 import { analyzeBasic, copiesFrom, findCopies, searchBooks } from './js/lookup.js';
 
 const app = document.getElementById('app');
@@ -579,10 +579,10 @@ async function analyze() {
   genreState.running = true;
   genreState.error = null;
   if (parts()[0] === 'genres') renderGenres('none');
-  const key = getApiKey();
+  const config = getConfig();
   try {
-    const result = key
-      ? await analyzeWithClaude(key, books, signature(), helpers)
+    const result = config
+      ? await analyzeWithAi(config, books, signature(), helpers)
       : await analyzeBasic(books, signature(), currentPage);
     genreState.analysis = result;
     store.set(GENRES_KEY, result);
@@ -595,18 +595,21 @@ async function analyze() {
 
 function renderGenres(dir) {
   const { analysis, running, error } = genreState;
-  const hasAi = !!getApiKey();
+  const ai = getConfig();
+  const hasAi = !!ai;
+  const name = ai && ai.provider.id !== 'custom' ? ai.provider.label : 'The AI';
   const outdated = !!analysis && analysis.librarySignature !== signature();
   // Basic mode is free, so keep it up to date automatically. AI runs only when asked.
   if (books.length && !hasAi && !running && !error && (!analysis || outdated)) setTimeout(analyze);
 
   let status;
-  if (running) status = hasAi ? 'Claude is reading your library…' : 'Sorting your books…';
-  else if (hasAi && analysis?.source === 'BASIC') status = "Showing basic results. Tap Analyze for Claude's take.";
-  else if (hasAi && !analysis) status = 'Tap Analyze to let Claude sort your books and pick what to read next.';
+  if (running) status = hasAi ? `${name} is reading your library…` : 'Sorting your books…';
+  else if (hasAi && analysis?.source === 'BASIC') status = `Showing basic results. Tap Analyze for ${name}'s take.`;
+  else if (hasAi && !analysis) status = `Tap Analyze to let ${name} sort your books and pick what to read next.`;
   else if (hasAi && outdated) status = 'Your library changed since the last analysis.';
-  else if (hasAi) status = 'Genres and picks by Claude.';
-  else status = "Genres from Open Library. Add an Anthropic API key for AI genres and personal picks.";
+  else if (hasAi && analysis?.madeBy && analysis.madeBy !== ai.displayName) status = `Last analysis by ${analysis.madeBy}. Tap Re-analyze to use ${name}.`;
+  else if (hasAi) status = `Genres and picks by ${name}.`;
+  else status = 'Genres from Open Library. Add an AI API key (Claude, Gemini, Grok, Kimi and more) for AI genres and personal picks.';
 
   let body = '';
   if (!books.length) {
@@ -616,7 +619,7 @@ function renderGenres(dir) {
     body = `<div class="panel mode ${hasAi ? 'ai' : ''}">
         <div class="row">
           <div class="mode-icon">${icon(hasAi ? 'psychology' : 'category')}</div>
-          <div class="grow"><div class="title">${hasAi ? `AI: ${MODEL_NAME}` : 'Basic mode'}</div><div class="muted body-m">${status}</div></div>
+          <div class="grow"><div class="title">${hasAi ? `AI: ${esc(ai.displayName)}` : 'Basic mode'}</div><div class="muted body-m">${status}</div></div>
         </div>
         ${running ? '<div class="center" style="margin-top:14px"><div class="loader big"></div></div>' : `
         <div class="row" style="margin-top:14px;gap:10px">
@@ -724,6 +727,7 @@ function navRow(ic, title, sub, cls, route) {
 
 function renderSettings(dir) {
   const a = appearance;
+  aiPagePick = null;
   app.innerHTML = `<section class="screen ${dir}">
     ${pageHeader('Settings')}
     ${preview()}
@@ -731,7 +735,7 @@ function renderSettings(dir) {
       ${navRow('palette', 'Theme & colors', `${labelOf(THEME_MODES, a.theme)} · ${labelOf(PALETTES, a.palette)}`, 'c0', 'theme')}
       ${navRow('text_fields', 'Text', `${labelOf(TEXT_SIZES, a.textSize)} · ${labelOf(FONTS, a.font)}${a.bold ? ' · Bold' : ''}`, 'c1', 'text')}
       ${navRow('style', 'Style', `${labelOf(CORNERS, a.corners)} corners · ${labelOf(ICON_STYLES, a.icons)} icons`, 'c2', 'style')}
-      ${navRow('psychology', 'AI', getApiKey() ? 'Claude connected' : 'Not set up · genres use basic mode', 'k1 nav-soft', 'ai')}
+      ${navRow('psychology', 'AI', getConfig() ? esc(getConfig().displayName) : 'Not set up · genres use basic mode', 'k1 nav-soft', 'ai')}
       ${navRow('save', 'Backups', 'Export and restore your books (CSV or JSON)', 'k0 nav-soft', 'backups')}
       <button class="btn outline big" data-reset>${icon('restart_alt')}Reset look to defaults</button>
       <p class="body-s muted">Book Tracker ${VERSION} (web)</p>
@@ -744,6 +748,9 @@ function renderSettings(dir) {
 function choice(value, label, selected, extra = '') {
   return `<button class="choice ${selected ? 'selected' : ''}" data-value="${value}" ${extra}>${label}</button>`;
 }
+
+// The provider being viewed on the AI page (it only becomes active once saved).
+let aiPagePick = null;
 
 function renderSettingsPage(page, dir) {
   const a = appearance;
@@ -785,25 +792,43 @@ function renderSettingsPage(page, dir) {
             <span class="icon-sample" data-icons="${v}">${['menu_book', 'settings', 'delete', 'person'].map((n) => icon(n)).join('')}</span></button>`).join('')}</div></div>`;
   } else if (page === 'ai') {
     title = 'AI';
-    const key = getApiKey();
+    const active = getConfig();
+    const p = providerById(aiPagePick || aiSettings.provider().id);
+    aiPagePick = p.id;
+    const savedKey = aiSettings.key(p.id);
+    const model = aiSettings.model(p.id);
     body = `<div class="panel k1" style="background:var(--secondary-container);color:var(--on-secondary-container)">
-        <div class="row" style="gap:10px">${icon('psychology')}<span class="headline-s">${MODEL_NAME}</span></div>
-        <p class="body-l" style="margin:8px 0 0">The Genres tab can use Claude, Anthropic's AI, to sort your library into genres, describe your reading taste and recommend books you'll like. It sends your books' titles, authors and reading progress to Anthropic when you tap Analyze.</p></div>
-      <div class="panel"><h2 class="headline-s">Anthropic API key</h2>
-        ${key ? `<div class="row" style="margin:12px 0"><span style="color:var(--primary)">${icon('check_circle')}</span>
-          <span class="title-m grow">Connected · ${esc(key.length > 12 ? key.slice(0, 7) + '…' + key.slice(-4) : 'saved')}</span>
+        <div class="row" style="gap:10px">${icon('psychology')}<span class="headline-s">${active ? `Using ${esc(active.displayName)}` : 'Not set up'}</span></div>
+        <p class="body-l" style="margin:8px 0 0">The Genres tab can use an AI of your choice to sort your library into genres, describe your reading taste and recommend books. It sends your books' titles, authors and reading progress to that service when you tap Analyze.</p></div>
+      <div class="panel"><h2 class="headline-s">AI service</h2>
+        <div class="choices">${PROVIDERS.map((x) => `<button class="choice ${x.id === p.id ? 'selected' : ''}" data-provider="${x.id}">
+          ${x.id === p.id ? icon('check') : aiSettings.key(x.id) ? icon('check_circle') : ''}${esc(x.label)}</button>`).join('')}</div>
+        ${p.id === 'openrouter' ? '<p class="muted body-m" style="margin:10px 0 0">OpenRouter gives one key for hundreds of models from many companies.</p>' : ''}
+      </div>
+      <div class="panel"><h2 class="headline-s">${esc(p.label)} settings</h2>
+        ${savedKey ? `<div class="row" style="margin:12px 0"><span style="color:var(--primary)">${icon('check_circle')}</span>
+          <span class="title-m grow">Key saved · ${esc(savedKey.length > 12 ? savedKey.slice(0, 6) + '…' + savedKey.slice(-4) : 'saved')}</span>
           <button class="btn text" data-remove-key>Remove</button></div>` : ''}
+        ${p.id === 'custom' ? `<div style="margin-top:12px"><label class="field">
+          <input data-base-url value="${esc(aiSettings.baseUrl('custom'))}" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://example.com/v1">
+          <span class="lbl">API base URL</span>${icon('link', 'lead')}
+        </label><div class="help">Any service with an OpenAI-compatible /chat/completions API</div></div>` : ''}
         <div style="margin-top:12px"><label class="field">
-          <input type="password" data-key autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…">
-          <span class="lbl">${key ? 'Replace key' : 'Paste your API key'}</span>${icon('key', 'lead')}
+          <input type="password" data-key autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(p.hint)}">
+          <span class="lbl">${savedKey ? 'Replace API key' : `Paste your ${esc(p.label)} API key`}</span>${icon('key', 'lead')}
           <span class="trail"><button class="icon-btn" data-show aria-label="Show key">${icon('visibility')}</button></span>
-        </label><div class="help" data-key-help></div></div>
-        <button class="btn big filled" data-save-key disabled style="margin-top:8px">Save key</button>
-        <a class="btn outline big" style="margin-top:8px" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">${icon('open_in_new')}Get a key from the Anthropic Console</a>
+        </label></div>
+        <div style="margin-top:12px"><label class="field">
+          <input data-model value="${esc(model)}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(p.model)}">
+          <span class="lbl">Model</span>${icon('psychology', 'lead')}
+        </label><div class="help">${p.model ? `Default: ${esc(p.model)}. Any model name from ${esc(p.label)} works.` : 'The model name your service uses'}</div></div>
+        <button class="btn big filled" data-save-ai disabled style="margin-top:8px">Save and use ${esc(p.label)}</button>
+        ${p.keyUrl ? `<a class="btn outline big" style="margin-top:8px" href="${esc(p.keyUrl)}" target="_blank" rel="noopener">${icon('open_in_new')}Get a ${esc(p.label)} API key</a>` : ''}
       </div>
       <div class="panel"><h2 class="headline-s">Good to know</h2>
-        <div class="note">${icon('lock')}<span>Your key is stored only in this browser on this device, and is sent only to Anthropic.</span></div>
-        <div class="note">${icon('bar_chart')}<span>Each analysis is billed to your Anthropic account, usually a few cents to about 25¢ depending on how many books you have. It only runs when you tap Analyze.</span></div>
+        <div class="note">${icon('lock')}<span>Keys are stored only in this browser on this device, and each is sent only to its own service.</span></div>
+        <div class="note">${icon('bar_chart')}<span>Usage is billed by the service you choose (some, like Gemini and Groq, have free tiers). It only runs when you tap Analyze.</span></div>
+        <div class="note">${icon('error')}<span>A few services don't accept requests from web apps. If one can't be reached here, try OpenRouter or the Android app.</span></div>
         <div class="note">${icon('category')}<span>Without a key, Genres still works in basic mode using Open Library's subject tags.</span></div>
       </div>`;
   } else if (page === 'backups') {
@@ -834,19 +859,37 @@ function renderSettingsPage(page, dir) {
   if (bold) bold.onchange = () => { setAppearance({ bold: bold.checked }); };
 
   if (page === 'ai') {
-    const input = app.querySelector('[data-key]'), help = app.querySelector('[data-key-help]'), save = app.querySelector('[data-save-key]');
-    input.oninput = () => {
-      input.value = input.value.trim();
-      help.textContent = input.value && !input.value.startsWith('sk-ant-') ? 'Anthropic keys start with sk-ant-' : '';
-      save.disabled = input.value.length <= 20;
+    const p = providerById(aiPagePick);
+    const keyIn = app.querySelector('[data-key]'), modelIn = app.querySelector('[data-model]'), urlIn = app.querySelector('[data-base-url]');
+    const save = app.querySelector('[data-save-ai]');
+    const check = () => {
+      const hasKey = keyIn.value.trim().length >= 8 || !!aiSettings.key(p.id);
+      save.disabled = !(hasKey && modelIn.value.trim() && (!urlIn || /^https?:\/\//.test(urlIn.value.trim())));
     };
+    [keyIn, modelIn, urlIn].forEach((el) => el?.addEventListener('input', check));
+    check();
+    app.querySelectorAll('[data-provider]').forEach((btn) => {
+      btn.onclick = () => {
+        aiPagePick = btn.dataset.provider;
+        // Switch straight away if this service is already set up.
+        if (aiSettings.key(aiPagePick)) aiSettings.setProvider(aiPagePick);
+        rerender();
+      };
+    });
     app.querySelector('[data-show]').onclick = (e) => {
-      const show = input.type === 'password';
-      input.type = show ? 'text' : 'password';
+      const show = keyIn.type === 'password';
+      keyIn.type = show ? 'text' : 'password';
       e.currentTarget.innerHTML = icon(show ? 'visibility_off' : 'visibility');
     };
-    save.onclick = () => { setApiKey(input.value); toast('Saved. Open Genres and tap Analyze.'); rerender(); };
-    app.querySelector('[data-remove-key]')?.addEventListener('click', () => { setApiKey(null); toast('API key removed'); rerender(); });
+    save.onclick = () => {
+      if (keyIn.value.trim()) aiSettings.setKey(p.id, keyIn.value);
+      aiSettings.setModel(p.id, modelIn.value.trim() || p.model);
+      if (urlIn) aiSettings.setCustomUrl(urlIn.value);
+      aiSettings.setProvider(p.id);
+      toast('Saved. Open Genres and tap Analyze.');
+      rerender();
+    };
+    app.querySelector('[data-remove-key]')?.addEventListener('click', () => { aiSettings.setKey(p.id, null); toast(`${p.label} key removed`); rerender(); });
   }
   if (page === 'backups') {
     app.querySelector('[data-csv]').onclick = () => download(booksToCsv(books), `booktracker-backup-${today()}.csv`, 'text/csv');
