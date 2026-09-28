@@ -5,8 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Book Tracker</title>
   <meta name="description" content="Track your books and the pages you read every day.">
-  <meta name="theme-color" content="#FFF8F4" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#151218" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#FFF8F4">
   <meta name="color-scheme" content="light dark">
   <!-- iOS home-screen app -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -23,7 +22,8 @@
 </head>
 <body>
   <main id="app" aria-live="polite"></main>
+  <nav id="tabs" class="tabs" aria-label="Main" hidden></nav>
   <div id="toast" role="status"></div>
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
