@@ -9,15 +9,17 @@ import {
   pagesToday, progress, replaceBooks, saveBooks, sortedEntries, streak, streakOf,
 } from './js/data.js';
 import {
-  CORNERS, FONTS, ICON_STYLES, PALETTES, TEXT_SIZES, THEME_MODES, appearance, applyAppearance, isDark,
-  loadFonts, paletteSwatch, setAppearance,
+  CORNERS, FONTS, ICON_STYLES, PALETTES, POPULAR_FONTS, SECTIONS, TABS, TEXT_SIZES, THEME_MODES, appearance, applyAppearance,
+  customFontName, fontLabel, fontStack, isDark, loadFonts, loadGoogleFont, paletteSwatch, seedSwatch, setAppearance,
 } from './js/theme.js';
+import { mountColorWheel } from './js/colorwheel.js';
 import { GENRES, PROVIDERS, aiSettings, analyzeWithAi, getConfig, librarySignature, providerById } from './js/ai.js';
 import { analyzeBasic, catalogDetails, catalogGenres, catalogSearch, copiesFrom, findCopies, searchBooks } from './js/lookup.js';
 
 const app = document.getElementById('app');
 const tabsBar = document.getElementById('tabs');
-const VERSION = '2.0';
+const VERSION = '2.1';
+const REPO = 'uzumakigojo78-prog/Book-Tracker-';
 
 // Ask the browser not to evict our data.
 navigator.storage?.persist?.().catch(() => {});
@@ -25,23 +27,30 @@ navigator.storage?.persist?.().catch(() => {});
 /* ---------- navigation (hash routes) ---------- */
 // Tabs: #/  #/genres  #/stats  #/settings
 // Pages: #/add[/<title>]  #/book/<id>[/log|/history]  #/book/<id>/edit  #/settings/<page>
-const TABS = [['', 'Books', 'menu_book'], ['genres', 'Genres', 'category'], ['stats', 'Stats', 'bar_chart'], ['settings', 'Settings', 'settings']];
+// Tabs in the reader's order: [route, label, icon]. The first one is home.
+const tabList = () => appearance.tabOrder.map((id) => TABS.find((t) => t[0] === id)).map(([, label, ic, route]) => [route, label, ic]);
+const homeRoute = () => tabList()[0][0];
 let navDepth = 0;
 let lastDepth = 0;
 let lastTab = '';
 
 const parts = () => location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
-const isTabRoute = (p) => p.length === 0 || (p.length === 1 && TABS.some(([r]) => r === p[0]));
+const isTabRoute = (p) => p.length === 0 || (p.length === 1 && TABS.some(([, , , r]) => r === p[0]));
 const depthOf = (p) => (isTabRoute(p) ? 0 : p[0] === 'book' && p[2] === 'edit' ? 2 : 1);
 
 function go(path) { navDepth++; location.hash = path; }
 function back(parent) {
+  if (parent === '/') parent = '/' + homeRoute();
   if (navDepth > 0) { navDepth--; history.back(); } else { location.replace('#' + parent); }
 }
 window.addEventListener('hashchange', render);
 
+let firstRender = true;
 function render() {
   closeOverlays();
+  // Opening the app lands on the first tab in the reader's order.
+  if (firstRender && parts().length === 0 && homeRoute()) { firstRender = false; location.replace('#/' + homeRoute()); return; }
+  firstRender = false;
   const p = parts();
   const depth = depthOf(p);
   const tab = isTabRoute(p) ? (p[0] || '') : null;
@@ -55,7 +64,7 @@ function render() {
   document.body.classList.toggle('has-tabs', tab !== null);
   if (tab !== null) {
     lastTab = tab;
-    tabsBar.innerHTML = TABS.map(([r, label, ic]) => `<a href="#/${r}" class="${r === tab ? 'active' : ''}" ${r === tab ? 'aria-current="page"' : ''}>
+    tabsBar.innerHTML = tabList().map(([r, label, ic]) => `<a href="#/${r}" class="${r === tab ? 'active' : ''}" ${r === tab ? 'aria-current="page"' : ''}>
       <span class="pill">${icon(ic)}</span><span>${label}</span></a>`).join('');
   }
   app.dataset.book = p[0] === 'book' ? p[1] : '';
@@ -177,22 +186,78 @@ function bindBookLinks(root = app) {
 }
 
 /* ---------- Books tab ---------- */
+const sectionOf = (b) => (isFinished(b) ? 'read' : currentPage(b) > 0 ? 'reading' : 'want');
+const lastRead = (b) => sortedEntries(b).at(-1)?.date || '';
+const SECTION_INFO = {
+  reading: { icon: 'auto_stories', cls: 'c0', empty: 'Log a page on a book to start reading it.' },
+  want: { icon: 'bookmark', cls: 'c1', empty: "Books you add but haven't started go here." },
+  read: { icon: 'task_alt', cls: 'c2', empty: 'Finished books land here.' },
+};
+const collapsed = new Set(store.get('booktracker.collapsed') || []);
+
 function renderLibrary(dir) {
   const reading = books.filter((b) => !isFinished(b)).length;
-  // Unfinished first, newest first.
-  const ordered = [...books].sort((a, b) => (isFinished(a) - isFinished(b)) || (b.createdAt - a.createdAt));
+  let i = 0;
+  const sections = appearance.sectionOrder.map((id) => {
+    const list = books.filter((b) => sectionOf(b) === id)
+      .sort(id === 'want' ? (a, b) => b.createdAt - a.createdAt : (a, b) => lastRead(b).localeCompare(lastRead(a)) || b.createdAt - a.createdAt);
+    const label = SECTIONS.find((x) => x[0] === id)[1];
+    const open = !collapsed.has(id);
+    return `<section class="book-section">
+      <button class="section-head" data-section="${id}" aria-expanded="${open}">
+        <span class="section-icon ${SECTION_INFO[id].cls}">${icon(SECTION_INFO[id].icon)}</span>
+        <span class="headline-s grow ellipsis">${label}</span><span class="count ${SECTION_INFO[id].cls}">${list.length}</span>${icon(open ? 'expand_less' : 'expand_more')}
+      </button>
+      ${!open ? '' : list.length ? `<div class="list">${list.map((b) => bookCard(b, i++)).join('')}</div>` : `<p class="muted body-m section-empty">${SECTION_INFO[id].empty}</p>`}
+    </section>`;
+  }).join('');
   app.innerHTML = `<section class="screen ${dir}">
-    ${pageHeader('My Books', books.length ? `${reading} reading · ${books.length - reading} finished` : '')}
+    <header class="page-head row"><div class="grow"><h1 class="display">My Books</h1>
+      ${books.length ? `<p class="title-m muted">${reading} reading · ${books.length - reading} finished</p>` : ''}</div>
+      ${books.length ? `<button class="icon-btn tonal" data-reorder aria-label="Reorder sections">${icon('swap_vert')}</button>` : ''}</header>
     ${books.length === 0 ? `
       <div class="empty">
         <div class="blob">${icon('menu_book')}</div>
         <h2 class="headline">No books yet</h2>
         <p class="muted">Tap “Add book” to start tracking what you read, day by day.</p>
-      </div>` : `<div class="list">${ordered.map((b, i) => bookCard(b, i)).join('')}</div>`}
+      </div>` : sections}
     <button class="fab" data-add>${icon('add')}Add book</button>
   </section>`;
   app.querySelector('[data-add]').onclick = () => go('/add');
+  app.querySelectorAll('[data-section]').forEach((el) => {
+    el.onclick = () => {
+      const id = el.dataset.section;
+      if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+      store.set('booktracker.collapsed', [...collapsed]);
+      renderLibrary('none');
+    };
+  });
+  app.querySelector('[data-reorder]')?.addEventListener('click', () => {
+    const body = openSheet('');
+    const draw = () => {
+      body.innerHTML = `<h2 class="headline-s">Reorder sections</h2><p class="muted body-m">Choose the order of your Books tab.</p>
+        ${reorderList(appearance.sectionOrder, (id) => SECTIONS.find((x) => x[0] === id)[1])}
+        <button class="btn big filled" data-done style="margin-top:16px">Done</button>`;
+      bindReorder(body, appearance.sectionOrder, (order) => { setAppearance({ sectionOrder: order }); draw(); renderLibrary('none'); });
+      body.querySelector('[data-done]').onclick = () => closeSheet();
+    };
+    draw();
+  });
   bindBookLinks();
+}
+
+/** Rows with up/down buttons for reordering. */
+function reorderList(items, label) {
+  return `<div class="stack reorder">${items.map((id, i) => `<div class="reorder-row">
+    <span class="reorder-num">${i + 1}</span><span class="title-m grow ellipsis">${esc(label(id))}</span>
+    <button class="icon-btn" data-up="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Move ${esc(label(id))} up">${icon('keyboard_arrow_up')}</button>
+    <button class="icon-btn" data-down="${i}" ${i === items.length - 1 ? 'disabled' : ''} aria-label="Move ${esc(label(id))} down">${icon('keyboard_arrow_down')}</button>
+  </div>`).join('')}</div>`;
+}
+function bindReorder(root, items, onChange) {
+  const move = (i, j) => { const next = [...items]; next.splice(j, 0, next.splice(i, 1)[0]); onChange(next); };
+  root.querySelectorAll('[data-up]').forEach((b) => { b.onclick = () => move(Number(b.dataset.up), Number(b.dataset.up) - 1); });
+  root.querySelectorAll('[data-down]').forEach((b) => { b.onclick = () => move(Number(b.dataset.down), Number(b.dataset.down) + 1); });
 }
 
 /* ---------- book page: Overview / Log / History tabs ---------- */
@@ -875,10 +940,11 @@ function renderSettings(dir) {
     ${preview()}
     <div class="stack" style="margin-top:14px">
       ${navRow('palette', 'Theme & colors', `${labelOf(THEME_MODES, a.theme)} · ${labelOf(PALETTES, a.palette)}`, 'c0', 'theme')}
-      ${navRow('text_fields', 'Text', `${labelOf(TEXT_SIZES, a.textSize)} · ${labelOf(FONTS, a.font)}${a.bold ? ' · Bold' : ''}`, 'c1', 'text')}
-      ${navRow('style', 'Style', `${labelOf(CORNERS, a.corners)} corners · ${labelOf(ICON_STYLES, a.icons)} icons`, 'c2', 'style')}
+      ${navRow('text_fields', 'Text', `${labelOf(TEXT_SIZES, a.textSize)} · ${esc(fontLabel(a.font))}${a.bold ? ' · Bold' : ''}`, 'c1', 'text')}
+      ${navRow('style', 'Style & layout', `${labelOf(CORNERS, a.corners)} corners · ${labelOf(ICON_STYLES, a.icons)} icons · tab order`, 'c2', 'style')}
       ${navRow('psychology', 'AI', getConfig() ? esc(getConfig().displayName) : 'Not set up · genres use basic mode', 'k1 nav-soft', 'ai')}
       ${navRow('save', 'Backups', 'Export and restore your books (CSV or JSON)', 'k0 nav-soft', 'backups')}
+      ${navRow('code', 'Developer', "App info, GitHub, updates and what's new", 'nav-plain', 'developer')}
       <button class="btn outline big" data-reset>${icon('restart_alt')}Reset look to defaults</button>
       <p class="body-s muted">Book Tracker ${VERSION} (web)</p>
     </div>
@@ -909,7 +975,13 @@ function renderSettingsPage(page, dir) {
           return `<button class="swatch ${a.palette === v ? 'selected' : ''}" data-value="${v}" aria-label="${l}">
             <span class="swatch-circle"><i style="background:${p}"></i><i style="background:${s}"></i><i style="background:${t}"></i>
             ${a.palette === v ? `<span class="swatch-check">${icon('check')}</span>` : ''}</span><span class="label">${l}</span></button>`;
-        }).join('')}</div></div>`;
+        }).join('')}</div></div>
+      <div class="panel"><h2 class="headline-s">Pick your own color</h2>
+        <div data-wheel style="margin-top:14px"></div>
+        <div class="label" style="margin:16px 0 8px">Your palette</div>
+        <div class="seed-swatches" data-seed-swatches></div>
+        <button class="btn big filled" data-use-color>${icon('colorize')}Use this color</button>
+      </div>`;
   } else if (page === 'text') {
     title = 'Text';
     body = `<div class="panel k0" style="background:var(--primary-container);color:var(--on-primary-container)">
@@ -918,13 +990,29 @@ function renderSettingsPage(page, dir) {
       <div class="panel"><h2 class="headline-s">Text size</h2>
         <div class="choices" data-group="textSize">${TEXT_SIZES.map(([v, l]) => choice(v, `${icon(a.textSize === v ? 'check' : 'format_size')}${l}`, a.textSize === v)).join('')}</div></div>
       <div class="panel"><h2 class="headline-s">Font</h2>
-        <div class="choices three" data-group="font">${FONTS.map(([v, l, stack]) => choice(v, `<span style="font-family:${esc(stack)};font-weight:700">${l}</span>`, a.font === v)).join('')}</div></div>
+        <div class="choices three" data-group="font">${FONTS.map(([v, l, stack]) => choice(v, `<span style="font-family:${esc(stack)};font-weight:700">${l}</span>`, a.font === v)).join('')}</div>
+        ${a.myFonts.length ? `<div class="title-m" style="margin:16px 0 8px">Your fonts</div>
+          <div class="stack">${a.myFonts.map((f) => `<div class="font-row ${customFontName(a.font) === f ? 'selected' : ''}">
+            <button class="grow font-pick" data-font="${esc(f)}" style="font-family:${esc(fontStack('gf:' + f))}">${esc(f)}</button>
+            <button class="icon-btn" data-remove-font="${esc(f)}" aria-label="Remove ${esc(f)}">${icon('delete')}</button></div>`).join('')}</div>` : ''}
+      </div>
+      <div class="panel"><h2 class="headline-s">Find a font</h2>
+        <p class="muted body-m">Search Google Fonts, which has over 1,500 free fonts. Tap one to use it everywhere in the app.</p>
+        <label class="field search-field" style="margin:10px 0 8px">
+          <input type="search" data-font-search placeholder="e.g. Playfair Display, Lobster" autocomplete="off" spellcheck="false">${icon('search', 'lead')}
+        </label>
+        <div class="help error" data-font-error></div>
+        <div class="stack font-results" data-font-results></div>
+      </div>
       <div class="panel row"><div class="grow"><h2 class="headline-s">Bold text</h2><div class="muted body-m">Heavy headings and numbers</div></div>
         <label class="switch"><input type="checkbox" data-bold ${a.bold ? 'checked' : ''}><span></span></label></div>`;
   } else if (page === 'style') {
-    title = 'Style';
+    title = 'Style & layout';
     loadFonts(['outlined', 'rounded', 'sharp']); // to preview every icon style
-    body = `${preview()}
+    body = `<div class="panel"><h2 class="headline-s">Tab order</h2>
+        <p class="muted body-m">Put the bottom tabs in any order. The first tab opens when you start the app.</p>
+        <div data-tab-order>${reorderList(a.tabOrder, (id) => TABS.find((t) => t[0] === id)[1])}</div></div>
+      ${preview()}
       <div class="panel"><h2 class="headline-s">Corners</h2>
         <div class="big-choices" data-group="corners">${CORNERS.map(([v, l, scale]) =>
           `<button class="big-choice ${a.corners === v ? 'selected' : ''}" data-value="${v}"><span class="corner-demo" style="border-radius:${Math.round(18 * scale)}px"></span><span class="label">${l}</span></button>`).join('')}</div></div>
@@ -973,6 +1061,21 @@ function renderSettingsPage(page, dir) {
         <div class="note">${icon('error')}<span>A few services don't accept requests from web apps. If one can't be reached here, try OpenRouter or the Android app.</span></div>
         <div class="note">${icon('category')}<span>Without a key, Genres still works in basic mode using Open Library's subject tags.</span></div>
       </div>`;
+  } else if (page === 'developer') {
+    title = 'Developer';
+    const link = (ic, t, sub, url) => `<a class="nav-row" href="${url}" target="_blank" rel="noopener"><span class="nav-icon nav-plain">${icon(ic)}</span>
+      <span class="grow"><span class="title-m block">${t}</span><span class="body-s muted block ellipsis">${sub}</span></span>${icon('open_in_new', 'muted')}</a>`;
+    body = `<div class="panel row" style="background:var(--primary-container);color:var(--on-primary-container)">
+        <img src="icons/icon-192.png" alt="" width="64" height="64" class="app-icon">
+        <div class="grow"><div class="headline-s">Book Tracker</div><div class="title-m">Web app ${VERSION}</div>
+          <div class="body-s">${esc(navigator.standalone || matchMedia('(display-mode: standalone)').matches ? 'Installed on home screen' : 'Running in the browser')}</div></div></div>
+      <div class="stack">
+        ${link('code', 'Source code on GitHub', REPO, `https://github.com/${REPO}`)}
+        ${link('new_releases', 'All releases & Android downloads', 'Every version with its APK', `https://github.com/${REPO}/releases`)}
+        ${link('bug_report', 'Report a problem or idea', 'Opens a new GitHub issue', `https://github.com/${REPO}/issues/new`)}
+      </div>
+      <div class="panel"><h2 class="headline-s">What's new</h2><div data-releases class="stack" style="margin-top:12px"><div class="center" style="padding:16px"><div class="loader"></div></div></div></div>
+      <div class="panel"><h2 class="headline-s">About</h2><p class="body-m" style="margin:8px 0 0">Plain HTML, CSS and JavaScript, installable on iPhone from Safari. The Android app is made with Kotlin, Jetpack Compose and Material 3 Expressive. Book data comes from Open Library and Google Books. Released under the MIT License. The web app updates itself whenever a new version is published.</p></div>`;
   } else if (page === 'backups') {
     title = 'Backups';
     body = `<div class="panel"><h2 class="headline-s">Save a copy</h2>
@@ -1000,6 +1103,74 @@ function renderSettingsPage(page, dir) {
   const bold = app.querySelector('[data-bold]');
   if (bold) bold.onchange = () => { setAppearance({ bold: bold.checked }); };
 
+  if (page === 'theme') {
+    let pick = a.customColor;
+    const swatches = app.querySelector('[data-seed-swatches]'), use = app.querySelector('[data-use-color]');
+    const show = () => {
+      swatches.innerHTML = seedSwatch(pick, isDark()).map((c, i) => `<div><i style="background:${c}"></i><span class="label">${['Main', 'Second', 'Accent'][i]}</span></div>`).join('');
+      use.innerHTML = `${icon('colorize')}${a.palette === 'custom' && a.customColor === pick ? 'Using this color' : 'Use this color'}`;
+    };
+    mountColorWheel(app.querySelector('[data-wheel]'), pick, (hex) => { pick = hex; show(); });
+    show();
+    use.onclick = () => { setAppearance({ palette: 'custom', customColor: pick }); toast('Your color is on'); rerender(); };
+  }
+  if (page === 'text') {
+    const input = app.querySelector('[data-font-search]'), results = app.querySelector('[data-font-results]'), err = app.querySelector('[data-font-error]');
+    const drawResults = () => {
+      const q = input.value.trim();
+      const matches = POPULAR_FONTS.filter((f) => !q || f.toLowerCase().includes(q.toLowerCase())).slice(0, q ? 20 : 12);
+      const typed = q && !POPULAR_FONTS.some((f) => f.toLowerCase() === q.toLowerCase());
+      results.innerHTML = [...(typed ? [q] : []), ...matches].map((f) => `<button class="font-result" data-get-font="${esc(f)}">
+        ${icon('font_download')}<span class="grow ellipsis title-m">${typed && f === q ? `Search Google Fonts for “${esc(f)}”` : esc(f)}</span>
+        ${customFontName(a.font)?.toLowerCase() === f.toLowerCase() ? `<span style="color:var(--primary)">${icon('check_circle')}</span>` : icon('download', 'muted')}</button>`).join('');
+      results.querySelectorAll('[data-get-font]').forEach((b) => {
+        b.onclick = async () => {
+          err.textContent = '';
+          b.querySelector('.ms:last-child').outerHTML = '<div class="loader small"></div>';
+          try {
+            const name = await loadGoogleFont(b.dataset.getFont);
+            setAppearance({ font: 'gf:' + name, myFonts: [...new Set([...appearance.myFonts, name])] });
+            toast(`Font changed to ${name}`);
+            rerender();
+          } catch (e) { err.textContent = e.message; drawResults(); }
+        };
+      });
+    };
+    input.addEventListener('input', () => { err.textContent = ''; drawResults(); });
+    drawResults();
+    // Show saved fonts in their own typeface.
+    a.myFonts.forEach((f) => loadGoogleFont(f).catch(() => {}));
+    app.querySelectorAll('[data-font]').forEach((b) => { b.onclick = () => { setAppearance({ font: 'gf:' + b.dataset.font }); rerender(); }; });
+    app.querySelectorAll('[data-remove-font]').forEach((b) => {
+      b.onclick = () => {
+        const f = b.dataset.removeFont;
+        setAppearance({ myFonts: appearance.myFonts.filter((x) => x !== f), ...(customFontName(appearance.font) === f ? { font: 'sans' } : {}) });
+        rerender();
+      };
+    });
+  }
+  if (page === 'style') {
+    const holder = app.querySelector('[data-tab-order]');
+    const drawTabs = () => {
+      holder.innerHTML = reorderList(appearance.tabOrder, (id) => TABS.find((t) => t[0] === id)[1]);
+      bindReorder(holder, appearance.tabOrder, (order) => { setAppearance({ tabOrder: order }); drawTabs(); });
+    };
+    drawTabs();
+  }
+  if (page === 'developer') {
+    const list = app.querySelector('[data-releases]');
+    fetch(`https://api.github.com/repos/${REPO}/releases?per_page=8`, { headers: { Accept: 'application/vnd.github+json' } })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
+      .then((releases) => {
+        if (!list.isConnected) return;
+        const clean = (body) => (body || '').split('\n').map((l) => l.trim())
+          .filter((l) => l && !l.startsWith('Download **') && !l.startsWith('Co-Authored-By') && !l.startsWith('Claude-Session')).join('\n').replace(/\*\*/g, '') || 'Bug fixes and improvements.';
+        list.innerHTML = releases.filter((r) => !r.draft).map((r) => `<a class="release" href="${esc(r.html_url)}" target="_blank" rel="noopener">
+          <div class="row"><span class="title grow">${esc(r.tag_name.replace(/^v/, ''))}</span><span class="body-s muted">${esc((r.published_at || '').slice(0, 10))}</span></div>
+          <p class="body-m muted release-notes">${esc(clean(r.body))}</p></a>`).join('') || '<p class="muted">No releases yet.</p>';
+      })
+      .catch(() => { if (list.isConnected) list.innerHTML = '<p class="muted">Couldn\'t reach GitHub. Check your connection.</p>'; });
+  }
   if (page === 'ai') {
     const p = providerById(aiPagePick);
     const keyIn = app.querySelector('[data-key]'), modelIn = app.querySelector('[data-model]'), urlIn = app.querySelector('[data-base-url]');
