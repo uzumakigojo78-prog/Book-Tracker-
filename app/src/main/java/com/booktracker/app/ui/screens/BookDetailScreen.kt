@@ -5,6 +5,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.ui.text.style.TextOverflow
+import com.booktracker.app.ui.components.BuySection
 import com.booktracker.app.ui.components.ButtonText
 import com.booktracker.app.ui.components.DailyBarChart
 import com.booktracker.app.ui.components.SectionCard
@@ -170,6 +171,7 @@ fun BookDetailScreen(
                             ButtonText("Find online copies", MaterialTheme.typography.titleSmall)
                         }
                     }
+                    item { SectionCard { BuySection(book.title, book.author) } }
                 }
 
                 DetailTab.LOG -> LazyColumn(contentPadding = listPadding, verticalArrangement = Arrangement.spacedBy(16.dp)) {

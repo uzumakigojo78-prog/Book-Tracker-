@@ -54,6 +54,7 @@ import com.booktracker.app.ai.CatalogBook
 import com.booktracker.app.ai.GENRES
 import com.booktracker.app.data.Book
 import com.booktracker.app.data.BookDetails
+import com.booktracker.app.ui.components.BuySection
 import com.booktracker.app.ui.components.ButtonText
 import com.booktracker.app.ui.components.BookBadge
 import com.booktracker.app.ui.components.bookAccent
@@ -260,6 +261,9 @@ fun BookInfoSheet(
                 book.googlePreviewUrl?.let { url -> LinkButton(AppIcons.OpenInNew, "Preview on Google Books") { uri.openUri(url) } }
                 LinkButton(AppIcons.Link, "Open Library page") { uri.openUri(book.openLibraryUrl) }
             }
+
+            Spacer(Modifier.height(18.dp))
+            BuySection(book.title, book.author)
 
             book.description?.let { text ->
                 Spacer(Modifier.height(18.dp))

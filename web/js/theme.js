@@ -13,7 +13,7 @@ export const FONTS = [
 export const CORNERS = [['xround', 'Extra round', 1], ['rounded', 'Rounded', 0.6], ['square', 'Square', 0.25]];
 export const ICON_STYLES = [['outlined', 'Outlined'], ['rounded', 'Rounded'], ['sharp', 'Sharp'], ['filled', 'Filled']];
 export const PALETTES = [['violet', 'Violet'], ['ocean', 'Ocean'], ['forest', 'Forest'], ['sunset', 'Sunset'], ['rose', 'Rose'], ['custom', 'Custom']];
-export const TABS = [['books', 'Books', 'menu_book', ''], ['genres', 'Genres', 'category', 'genres'], ['stats', 'Stats', 'bar_chart', 'stats'], ['settings', 'Settings', 'settings', 'settings']];
+export const TABS = [['books', 'Books', 'menu_book', ''], ['genres', 'Genres', 'category', 'genres'], ['library', 'Library', 'local_library', 'library'], ['stats', 'Stats', 'bar_chart', 'stats'], ['settings', 'Settings', 'settings', 'settings']];
 export const SECTIONS = [['reading', 'Currently reading'], ['want', 'Want to read'], ['read', 'Read']];
 
 const DEFAULTS = {
@@ -22,7 +22,13 @@ const DEFAULTS = {
 };
 
 /** A saved order with any new entries appended, so tabs/sections never disappear. */
-const fullOrder = (saved, all) => [...new Set([...(saved || []).filter((x) => all.includes(x)), ...all])];
+// A saved order, with anything added in an update slotted in where it is by default.
+const fullOrder = (saved, all) => {
+  const out = [...new Set((saved || []).filter((x) => all.includes(x)))];
+  if (!out.length) return [...all];
+  all.forEach((x, i) => { if (!out.includes(x)) out.splice(Math.min(i, out.length), 0, x); });
+  return out;
+};
 
 export let appearance = normalize({ ...DEFAULTS, ...(store.get(KEY) || {}) });
 
@@ -172,13 +178,14 @@ export async function loadGoogleFont(name) {
 
 // Every Material Symbol the app shows (Google Fonts subsets to these; must stay sorted).
 export const ICON_NAMES = [
-  'add', 'arrow_back', 'auto_awesome', 'auto_stories', 'bar_chart', 'bookmark', 'brightness_auto', 'bug_report',
-  'category', 'check', 'check_circle', 'chevron_right', 'close', 'code', 'colorize', 'dark_mode', 'delete',
-  'download', 'edit', 'error', 'event', 'expand_less', 'expand_more', 'font_download', 'format_size', 'history',
-  'key', 'keyboard_arrow_down', 'keyboard_arrow_up', 'library_add', 'light_mode', 'link', 'local_fire_department',
-  'lock', 'menu_book', 'new_releases', 'open_in_new', 'palette', 'person', 'psychology', 'refresh', 'restart_alt',
-  'save', 'search', 'settings', 'style', 'swap_vert', 'task_alt', 'text_fields', 'upload', 'visibility',
-  'visibility_off',
+  'add', 'arrow_back', 'auto_awesome', 'auto_stories', 'bar_chart', 'bookmark', 'brightness_auto',
+  'bug_report', 'call', 'category', 'check', 'check_circle', 'chevron_right', 'close', 'code', 'colorize',
+  'content_copy', 'credit_card', 'dark_mode', 'delete', 'download', 'edit', 'error', 'event', 'expand_less',
+  'expand_more', 'font_download', 'format_size', 'history', 'key', 'keyboard_arrow_down', 'keyboard_arrow_up',
+  'language', 'library_add', 'light_mode', 'link', 'link_off', 'local_fire_department', 'local_library',
+  'lock', 'map', 'menu_book', 'my_location', 'new_releases', 'open_in_new', 'palette', 'person', 'place',
+  'psychology', 'refresh', 'restart_alt', 'save', 'schedule', 'search', 'settings', 'shopping_cart',
+  'storefront', 'style', 'swap_vert', 'task_alt', 'text_fields', 'upload', 'visibility', 'visibility_off',
 ];
 
 const loaded = new Set();

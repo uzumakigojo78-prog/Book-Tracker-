@@ -57,6 +57,7 @@ import com.booktracker.app.ui.screens.AppearancePage
 import com.booktracker.app.ui.screens.BackupScreen
 import com.booktracker.app.ui.screens.BookDetailScreen
 import com.booktracker.app.ui.screens.BookEditorScreen
+import com.booktracker.app.ui.screens.LibraryHubScreen
 import com.booktracker.app.ui.screens.LibraryScreen
 import com.booktracker.app.ui.screens.SettingsPage
 import com.booktracker.app.ui.screens.SettingsScreen
@@ -99,7 +100,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        /** Deep links look like booktracker://open/add, …/settings, …/detail/<id>, …/log/<id>. */
+        /** Deep links look like booktracker://open/add, …/settings, …/library, …/detail/<id>, …/log/<id>. */
         fun routeFrom(intent: Intent?): String? {
             val uri = intent?.data ?: return null
             if (uri.scheme != "booktracker") return null
@@ -110,6 +111,7 @@ class MainActivity : ComponentActivity() {
                 "stats" -> STATS
                 "settings" -> SETTINGS
                 "books" -> LIBRARY
+                "library" -> HUB
                 "detail" -> parts.getOrNull(1)?.let { DETAIL + it }
                 "log" -> parts.getOrNull(1)?.let { LOG + it }
                 else -> null
@@ -122,12 +124,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// Tabs: "library", "genres", "stats", "settings".
+// Tabs: "library", "genres", "hub", "stats", "settings".
 // Pages: "settings/<page>", "add", "add:<title>", "detail:<id>", "log:<id>" (detail on its Log tab), "edit:<id>".
 private const val LIBRARY = "library"
 private const val GENRES_TAB = "genres"
 private const val STATS = "stats"
 private const val SETTINGS = "settings"
+private const val HUB = "hub"
 private const val SETTINGS_PAGE = "settings/"
 private const val ADD = "add"
 private const val ADD_TITLED = "add:"
@@ -138,6 +141,7 @@ private const val LOG = "log:"
 private val AppTab.route: String get() = when (this) {
     AppTab.BOOKS -> LIBRARY
     AppTab.GENRES -> GENRES_TAB
+    AppTab.LIBRARY -> HUB
     AppTab.STATS -> STATS
     AppTab.SETTINGS -> SETTINGS
 }
@@ -146,6 +150,7 @@ private val AppTab.icon: ImageVector
     @Composable get() = when (this) {
         AppTab.BOOKS -> AppIcons.MenuBook
         AppTab.GENRES -> AppIcons.Category
+        AppTab.LIBRARY -> AppIcons.LocalLibrary
         AppTab.STATS -> AppIcons.BarChart
         AppTab.SETTINGS -> AppIcons.Settings
     }
@@ -255,6 +260,12 @@ fun BookTrackerApp(
                     onAddBook = { title -> route = ADD_TITLED + title },
                     onAddDirect = { details, onAdded -> viewModel.addBook(details, onAdded) },
                     onSetUpAi = { route = SETTINGS_PAGE + SettingsPage.AI.name },
+                    modifier = tabModifier,
+                )
+
+                current == HUB -> LibraryHubScreen(
+                    books = books,
+                    onOpenBook = { id -> route = DETAIL + id },
                     modifier = tabModifier,
                 )
 
