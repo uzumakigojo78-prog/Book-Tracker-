@@ -40,11 +40,14 @@ indicators and springy motion.
 3. Open Book Tracker from your home screen: it runs full-screen, works offline and
    keeps your books on your phone.
 
-Use **⋮ → Back up books** (or **Export CSV**) now and then to save a copy of your data.
-Browsers can't run scheduled backups in the background, so automatic backups are
-Android-only.
+The web app has the same tabs and features as the Android app (Books, Genres with
+AI, Stats, Settings with themes, text and icon styles). Use **Settings → Backups** now
+and then to save a CSV or JSON copy of your data; it can also restore CSV backups made
+by the Android app. Browsers can't run scheduled backups in the background, so
+automatic backups are Android-only.
 
-The web app lives in [`web/`](web) (plain HTML/CSS/JS, no build step) and is
+The web app lives in [`web/`](web) (plain HTML/CSS/JS modules, no build step; the
+Anthropic SDK is bundled in `web/vendor/`) and is
 published to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
 If the site isn't live after the first deploy, open **Settings → Pages** and set the
 source to **Deploy from a branch → `gh-pages` / root**.

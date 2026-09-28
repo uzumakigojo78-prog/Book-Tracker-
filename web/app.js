@@ -1,89 +1,39 @@
-'use strict';
-// Book Tracker for the web (iPhone via "Add to Home Screen"). Same data model
-// as the Android app: books with a day-by-day log of the page reached.
+// Book Tracker for the web (iPhone via "Add to Home Screen"). Same features and data
+// model as the Android app: tabs for Books, Genres, Stats and Settings.
+import {
+  addDays, clamp, closeOverlays, closeSheet, confirmDialog, download, esc, fromISO, icon, openSheet,
+  prettyDate, relDate, store, toast, today, uuid,
+} from './js/util.js';
+import {
+  books, booksFromBackup, booksToCsv, colorIndex, currentPage, dailyPages, findBook, isFinished, logPage,
+  pagesToday, progress, replaceBooks, saveBooks, sortedEntries, streak, streakOf,
+} from './js/data.js';
+import {
+  CORNERS, FONTS, ICON_STYLES, PALETTES, TEXT_SIZES, THEME_MODES, appearance, applyAppearance, isDark,
+  loadFonts, paletteSwatch, setAppearance,
+} from './js/theme.js';
+import { GENRES, MODEL_NAME, analyzeWithClaude, getApiKey, librarySignature, setApiKey } from './js/ai.js';
+import { analyzeBasic, copiesFrom, findCopies, searchBooks } from './js/lookup.js';
 
-const STORE_KEY = 'booktracker.v1';
 const app = document.getElementById('app');
+const tabsBar = document.getElementById('tabs');
+const VERSION = '2.0';
 
-/* ---------- icons (Material Symbols, 24px) ---------- */
-const ICONS = {
-  add: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
-  back: 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z',
-  edit: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
-  delete: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
-  close: 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
-  check: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z',
-  person: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
-  event: 'M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z',
-  search: 'M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',
-  book: 'M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z',
-  fire: 'M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z',
-  more: 'M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z',
-  sparkle: 'M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z',
-};
-const icon = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
-
-/* ---------- small helpers ---------- */
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const pad = (n) => String(n).padStart(2, '0');
-const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const fromISO = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
-const today = () => toISO(new Date());
-const addDays = (iso, n) => { const d = fromISO(iso); d.setDate(d.getDate() + n); return toISO(d); };
-const prettyDate = (iso) => fromISO(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-const relDate = (iso) => (iso === today() ? 'Today' : iso === addDays(today(), -1) ? 'Yesterday' : prettyDate(iso));
-const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-
-/* ---------- data ---------- */
-let books = loadBooks();
-
-function loadBooks() {
-  try {
-    const data = JSON.parse(localStorage.getItem(STORE_KEY));
-    return Array.isArray(data?.books) ? data.books : [];
-  } catch { return []; }
-}
-function saveBooks() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, books })); }
-  catch { toast("Couldn't save. Is private browsing on?"); }
-}
 // Ask the browser not to evict our data.
 navigator.storage?.persist?.().catch(() => {});
 
-const sortedEntries = (b) => [...b.entries].sort((x, y) => x.date.localeCompare(y.date));
-const currentPage = (b) => sortedEntries(b).at(-1)?.page ?? 0;
-const progress = (b) => (b.totalPages > 0 ? clamp(currentPage(b) / b.totalPages, 0, 1) : 0);
-const isFinished = (b) => b.totalPages > 0 && currentPage(b) >= b.totalPages;
-/** Pages read on each logged day, newest first. */
-function dailyPages(b) {
-  let prev = 0;
-  return sortedEntries(b).map((e) => {
-    const read = Math.max(0, e.page - prev); prev = e.page;
-    return { date: e.date, page: e.page, read };
-  }).reverse();
-}
-const pagesToday = (b) => dailyPages(b).find((d) => d.date === today())?.read ?? 0;
-function streak(b) {
-  const days = new Set(dailyPages(b).filter((d) => d.read > 0).map((d) => d.date));
-  let day = today(); if (!days.has(day)) day = addDays(day, -1);
-  let n = 0; while (days.has(day)) { n++; day = addDays(day, -1); }
-  return n;
-}
-const colorIndex = (b) => books.indexOf(b) % 3;
-const findBook = (id) => books.find((b) => b.id === id);
-
-function logPage(b, date, page) {
-  b.entries = b.entries.filter((e) => e.date !== date);
-  b.entries.push({ date, page: clamp(page, 0, b.totalPages) });
-  saveBooks();
-}
-
 /* ---------- navigation (hash routes) ---------- */
-// #/  |  #/add  |  #/book/<id>  |  #/book/<id>/edit
+// Tabs: #/  #/genres  #/stats  #/settings
+// Pages: #/add[/<title>]  #/book/<id>[/log|/history]  #/book/<id>/edit  #/settings/<page>
+const TABS = [['', 'Books', 'menu_book'], ['genres', 'Genres', 'category'], ['stats', 'Stats', 'bar_chart'], ['settings', 'Settings', 'settings']];
 let navDepth = 0;
-let lastRouteDepth = 0;
-const depthOf = (parts) => (parts[0] === 'book' ? (parts[2] === 'edit' ? 2 : 1) : parts[0] === 'add' ? 1 : 0);
+let lastDepth = 0;
+let lastTab = '';
+
+const parts = () => location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
+const isTabRoute = (p) => p.length === 0 || (p.length === 1 && TABS.some(([r]) => r === p[0]));
+const depthOf = (p) => (isTabRoute(p) ? 0 : p[0] === 'book' && p[2] === 'edit' ? 2 : 1);
+
 function go(path) { navDepth++; location.hash = path; }
 function back(parent) {
   if (navDepth > 0) { navDepth--; history.back(); } else { location.replace('#' + parent); }
@@ -92,22 +42,40 @@ window.addEventListener('hashchange', render);
 
 function render() {
   closeOverlays();
-  const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
-  const depth = depthOf(parts);
-  const dir = depth < lastRouteDepth ? 'back' : '';
-  lastRouteDepth = depth;
-  window.scrollTo(0, 0);
-  if (parts[0] === 'add') return renderEditor(null, dir);
-  if (parts[0] === 'book') {
-    const book = findBook(parts[1]);
-    if (!book) { location.replace('#/'); return; }
-    return parts[2] === 'edit' ? renderEditor(book, dir) : renderDetail(book, dir);
+  const p = parts();
+  const depth = depthOf(p);
+  const tab = isTabRoute(p) ? (p[0] || '') : null;
+  // Tab switches fade; pushing a page slides in; going back slides the other way.
+  const dir = tab !== null && lastDepth === 0 ? 'fade' : depth < lastDepth ? 'back' : '';
+  const sameBook = p[0] === 'book' && app.dataset.book === p[1] && p[2] !== 'edit' && lastDepth === 1;
+  lastDepth = depth;
+  if (!sameBook) window.scrollTo(0, 0);
+
+  tabsBar.hidden = tab === null;
+  document.body.classList.toggle('has-tabs', tab !== null);
+  if (tab !== null) {
+    lastTab = tab;
+    tabsBar.innerHTML = TABS.map(([r, label, ic]) => `<a href="#/${r}" class="${r === tab ? 'active' : ''}" ${r === tab ? 'aria-current="page"' : ''}>
+      <span class="pill">${icon(ic)}</span><span>${label}</span></a>`).join('');
   }
+  app.dataset.book = p[0] === 'book' ? p[1] : '';
+
+  if (p[0] === 'add') return renderEditor(null, dir, p[1] || '');
+  if (p[0] === 'book') {
+    const book = findBook(p[1]);
+    if (!book) { location.replace('#/'); return; }
+    return p[2] === 'edit' ? renderEditor(book, dir) : renderDetail(book, sameBook ? 'none' : dir, p[2] || 'overview');
+  }
+  if (p[0] === 'settings' && p[1]) return renderSettingsPage(p[1], dir);
+  if (p[0] === 'genres') return renderGenres(dir);
+  if (p[0] === 'stats') return renderStats(dir);
+  if (p[0] === 'settings') return renderSettings(dir);
+  if (p.length) { location.replace('#/'); return; }
   renderLibrary(dir);
 }
 
 /* ---------- shared pieces ---------- */
-function badge(b, idx, size = '') {
+function badge(b, idx, size = '', persist = true) {
   const letter = esc((b.title || '?').trim().charAt(0).toUpperCase() || '?');
   const img = b.coverUrl
     ? `<img src="${esc(b.coverUrl)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="this.remove()">`
@@ -155,158 +123,93 @@ function wavyRing(p) {
   </svg>`;
 }
 
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => t.classList.remove('show'), 2600);
+function pageHeader(title, subtitle = '') {
+  return `<header class="page-head"><h1 class="display">${esc(title)}</h1>${subtitle ? `<p class="title-m muted">${esc(subtitle)}</p>` : ''}</header>`;
 }
 
-function closeOverlays() { document.querySelectorAll('.scrim, .menu').forEach((el) => el.remove()); }
-
-function confirmDialog({ title, text, confirm, danger }) {
-  return new Promise((resolve) => {
-    const scrim = document.createElement('div');
-    scrim.className = 'scrim';
-    scrim.innerHTML = `<div class="dialog" role="alertdialog" aria-modal="true">
-      <h2 class="headline-s">${esc(title)}</h2><p class="muted">${esc(text)}</p>
-      <div class="actions"><button class="btn text" data-no>Cancel</button>
-      <button class="btn ${danger ? 'danger' : 'filled'}" data-yes>${esc(confirm)}</button></div></div>`;
-    const done = (v) => { scrim.remove(); resolve(v); };
-    scrim.addEventListener('click', (e) => { if (e.target === scrim || e.target.closest('[data-no]')) done(false); });
-    scrim.querySelector('[data-yes]').addEventListener('click', () => done(true));
-    document.body.appendChild(scrim);
-  });
+function subPageBar(title, extra = '') {
+  return `<header class="bar">
+    <button class="icon-btn" data-back aria-label="Back">${icon('arrow_back')}</button>
+    <h1 class="headline-s grow bar-title">${esc(title)}</h1>${extra}
+  </header>`;
 }
 
-/* ---------- library ---------- */
-function renderLibrary(dir) {
-  const reading = books.filter((b) => !isFinished(b)).length;
-  const finished = books.length - reading;
-  const todayPages = books.reduce((n, b) => n + pagesToday(b), 0);
-  // Unfinished first, newest first.
-  const ordered = [...books].sort((a, b) => (isFinished(a) - isFinished(b)) || (b.createdAt - a.createdAt));
-
-  app.innerHTML = `<section class="screen ${dir}">
-    <header class="bar" style="margin-left:0">
-      <h1 class="display grow">My Books</h1>
-      <button class="icon-btn" data-menu aria-label="More options">${icon('more')}</button>
-    </header>
-    ${books.length === 0 ? `
-      <div class="empty">
-        <div class="blob">${icon('book')}</div>
-        <h2 class="headline">No books yet</h2>
-        <p class="muted">Tap “Add book” to start tracking what you read, day by day.</p>
-      </div>` : `
-      <div class="stats">
-        <div class="stat c0"><b>${reading}</b><span>Reading</span></div>
-        <div class="stat c1" style="animation-delay:.05s"><b>${todayPages}</b><span>Pages today</span></div>
-        <div class="stat c2" style="animation-delay:.1s"><b>${finished}</b><span>Finished</span></div>
-      </div>
-      <div class="list">${ordered.map((b, i) => bookCard(b, i)).join('')}</div>`}
-    <button class="fab" data-add>${icon('add')}Add book</button>
-  </section>`;
-
-  app.querySelector('[data-add]').onclick = () => go('/add');
-  app.querySelector('[data-menu]').onclick = openLibraryMenu;
-  app.querySelectorAll('[data-book]').forEach((el) => { el.onclick = () => go('/book/' + el.dataset.book); });
+/** Bars for pages read per day, oldest first; today's bar in the secondary colour. */
+function chart(range, values) {
+  return `<div class="chart" data-chart data-values="${values.join(',')}">
+      ${range.map((d, i) => `<i class="${values[i] === 0 ? 'zero' : ''} ${d === today() && values[i] > 0 ? 'today' : ''}"></i>`).join('')}
+    </div>
+    <div class="days">${range.map((d) => `<span class="${d === today() ? 'today' : ''}">${fromISO(d).toLocaleDateString(undefined, { weekday: 'narrow' })}</span>`).join('')}</div>`;
 }
 
-function bookCard(b, i) {
-  const idx = colorIndex(b);
+/** Grows chart bars in after render (so they animate). */
+function animateCharts() {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    app.querySelectorAll('[data-chart]').forEach((c) => {
+      const values = c.dataset.values.split(',').map(Number);
+      const max = Math.max(1, ...values);
+      c.querySelectorAll('i').forEach((bar, i) => {
+        bar.style.height = (values[i] === 0 ? 4 : Math.max(8, (values[i] / max) * 100)) + '%';
+      });
+    });
+  }));
+}
+
+function bookCard(b, i, idx = colorIndex(b), clickable = true) {
   const pct = Math.floor(progress(b) * 100);
-  return `<button class="card k${idx}" data-book="${esc(b.id)}" style="animation-delay:${Math.min(i, 8) * 0.04}s">
+  return `<${clickable ? 'button' : 'div'} class="card k${idx}" ${clickable ? `data-book="${esc(b.id)}"` : ''} style="animation-delay:${Math.min(i, 8) * 0.04}s">
     <div class="row">
       ${badge(b, idx)}
       <div class="grow">
         <h3 class="title clamp2">${esc(b.title)}</h3>
-        ${b.author ? `<div class="ellipsis" style="font-size:17px">by ${esc(b.author)}</div>` : ''}
-        ${b.releaseDate ? `<div style="font-size:13px">Released ${esc(prettyDate(b.releaseDate))}</div>` : ''}
+        ${b.author ? `<div class="ellipsis body-l">by ${esc(b.author)}</div>` : ''}
+        ${b.releaseDate ? `<div class="body-s">Released ${esc(prettyDate(b.releaseDate))}</div>` : ''}
       </div>
-      ${isFinished(b) ? icon('check', 'check') : ''}
+      ${isFinished(b) ? `<span class="check">${icon('check_circle')}</span>` : ''}
     </div>
     ${wavyLine(progress(b))}
     <div class="progress-row"><span class="title-m grow">Page ${currentPage(b)} of ${b.totalPages}</span><span class="pct">${pct}%</span></div>
-  </button>`;
+  </${clickable ? 'button' : 'div'}>`;
 }
 
-function openLibraryMenu() {
-  closeOverlays();
-  const menu = document.createElement('div');
-  menu.className = 'menu';
-  menu.innerHTML = `<button data-export>Back up books</button><button data-csv>Export CSV (spreadsheet)</button><button data-import>Restore from backup</button>`;
-  const scrim = document.createElement('div');
-  scrim.className = 'scrim'; scrim.style.background = 'transparent';
-  scrim.onclick = closeOverlays;
-  document.body.append(scrim, menu);
-
-  menu.querySelector('[data-export]').onclick = () => {
-    closeOverlays();
-    download(JSON.stringify({ version: 1, books }, null, 2), `book-tracker-backup-${today()}.json`, 'application/json');
-  };
-  menu.querySelector('[data-csv]').onclick = () => {
-    closeOverlays();
-    download(booksToCsv(books), `booktracker-backup-${today()}.csv`, 'text/csv');
-  };
-  menu.querySelector('[data-import]').onclick = () => {
-    closeOverlays();
-    const input = document.createElement('input');
-    input.type = 'file'; input.accept = 'application/json,.json';
-    input.onchange = async () => {
-      try {
-        const data = JSON.parse(await input.files[0].text());
-        if (!Array.isArray(data?.books)) throw new Error('bad file');
-        const ok = await confirmDialog({ title: 'Restore backup?', text: `This replaces your current books with ${data.books.length} from the backup.`, confirm: 'Restore' });
-        if (!ok) return;
-        books = data.books.map((b) => ({ entries: [], createdAt: 0, coverUrl: null, releaseDate: null, author: '', ...b }));
-        saveBooks(); render(); toast('Backup restored');
-      } catch { toast("That doesn't look like a Book Tracker backup"); }
-    };
-    input.click();
-  };
+function bindBookLinks(root = app) {
+  root.querySelectorAll('[data-book]').forEach((el) => { el.onclick = () => go('/book/' + el.dataset.book); });
 }
 
-function download(text, filename, type) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type }));
-  a.download = filename;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+/* ---------- Books tab ---------- */
+function renderLibrary(dir) {
+  const reading = books.filter((b) => !isFinished(b)).length;
+  // Unfinished first, newest first.
+  const ordered = [...books].sort((a, b) => (isFinished(a) - isFinished(b)) || (b.createdAt - a.createdAt));
+  app.innerHTML = `<section class="screen ${dir}">
+    ${pageHeader('My Books', books.length ? `${reading} reading · ${books.length - reading} finished` : '')}
+    ${books.length === 0 ? `
+      <div class="empty">
+        <div class="blob">${icon('menu_book')}</div>
+        <h2 class="headline">No books yet</h2>
+        <p class="muted">Tap “Add book” to start tracking what you read, day by day.</p>
+      </div>` : `<div class="list">${ordered.map((b, i) => bookCard(b, i)).join('')}</div>`}
+    <button class="fab" data-add>${icon('add')}Add book</button>
+  </section>`;
+  app.querySelector('[data-add]').onclick = () => go('/add');
+  bindBookLinks();
 }
 
-/** Same CSV layout as the Android app's backups: one row per logged day. */
-function booksToCsv(list) {
-  const cell = (v) => { const s = String(v ?? ''); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-  const rows = [['book_id', 'title', 'author', 'release_date', 'total_pages', 'cover_url', 'added_at', 'log_date', 'page_reached', 'pages_read']];
-  for (const b of list) {
-    const base = [b.id, b.title, b.author, b.releaseDate, b.totalPages, b.coverUrl, b.createdAt];
-    const days = dailyPages(b).reverse();
-    if (days.length === 0) rows.push([...base, '', '', '']);
-    days.forEach((d) => rows.push([...base, d.date, d.page, d.read]));
-  }
-  return '\uFEFF' + rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
-}
+/* ---------- book page: Overview / Log / History tabs ---------- */
+const DETAIL_TABS = [['overview', 'Overview', 'menu_book'], ['log', 'Log', 'edit'], ['history', 'History', 'history']];
 
-/* ---------- book detail ---------- */
-function renderDetail(b, dir) {
+function renderDetail(b, dir, tab) {
   const idx = colorIndex(b);
   const pct = Math.floor(progress(b) * 100);
-  const days = dailyPages(b);
   const s = streak(b);
+  if (!DETAIL_TABS.some(([t]) => t === tab)) tab = 'overview';
 
-  app.innerHTML = `<section class="screen ${dir}">
-    <header class="bar">
-      <button class="icon-btn" data-back aria-label="Back">${icon('back')}</button>
-      <span class="grow"></span>
-      <button class="icon-btn" data-edit aria-label="Edit book">${icon('edit')}</button>
-      <button class="icon-btn" data-delete aria-label="Delete book">${icon('delete')}</button>
-    </header>
-
+  const overview = `
     <div class="hero k${idx}">
       <div class="row" style="align-items:flex-start">
         ${b.coverUrl ? badge(b, idx, 'big') : ''}
         <div class="grow">
-          <h1 class="${b.coverUrl ? 'headline' : 'display'}">${esc(b.title)}</h1>
+          <h2 class="${b.coverUrl ? 'headline' : 'display'}">${esc(b.title)}</h2>
           <div style="margin-top:10px">
             ${b.author ? `<div class="info">${icon('person')}${esc(b.author)}</div>` : ''}
             <div class="info">${icon('event')}${b.releaseDate ? 'Released ' + esc(prettyDate(b.releaseDate)) : 'Release date unknown'}</div>
@@ -320,11 +223,18 @@ function renderDetail(b, dir) {
         <div class="stack">
           <div class="big-stat"><b>${currentPage(b)}</b><span>of ${b.totalPages} pages</span></div>
           <div class="big-stat"><b>${Math.max(0, b.totalPages - currentPage(b))}</b><span>pages left</span></div>
-          ${s > 0 ? `<div class="info" style="font-size:15px"><svg viewBox="0 0 24 24" style="fill:var(--accent)"><path d="${ICONS.fire}"/></svg>${s} day streak</div>` : ''}
+          ${s > 0 ? `<div class="info small"><span style="color:var(--accent)">${icon('local_fire_department')}</span>${s} day streak</div>` : ''}
         </div>
       </div>
     </div>
+    <div class="panel row">
+      <div class="grow"><div class="title-m muted">Today</div>
+        <div class="headline-s">${pagesToday(b) > 0 ? `+${pagesToday(b)} pages` : 'Not logged yet'}</div></div>
+      ${isFinished(b) ? '' : `<button class="btn filled k${idx} accent-btn" data-go-log>${icon('edit')}Log reading</button>`}
+    </div>
+    <button class="btn outline big" data-copies>${icon('download')}Find online copies</button>`;
 
+  const log = `
     <div class="panel">
       <h2 class="headline-s">Log your reading</h2>
       <div style="margin-top:16px">
@@ -336,37 +246,88 @@ function renderDetail(b, dir) {
       <div style="margin-top:12px">
         <label class="field">
           <input data-page inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off">
-          <span class="lbl">Page I'm on</span>${icon('book', 'lead')}<span class="suffix">/ ${b.totalPages}</span>
+          <span class="lbl">Page I'm on</span>${icon('menu_book', 'lead')}<span class="suffix">/ ${b.totalPages}</span>
         </label>
         <div class="help" data-help></div>
       </div>
       <div class="chips">${[1, 5, 10, 25].map((n) => `<button class="btn" data-bump="${n}">+${n}</button>`).join('')}</div>
       <div class="row" style="margin-top:16px;gap:12px">
         <button class="btn big filled grow" data-save>Save page</button>
-        <button class="btn" data-end style="height:64px;width:64px;border-radius:20px;padding:0">END</button>
+        <button class="btn square-btn" data-end>END</button>
       </div>
-    </div>
+    </div>`;
 
+  const days = dailyPages(b);
+  const byDate = Object.fromEntries(days.map((d) => [d.date, d.read]));
+  const range = Array.from({ length: 14 }, (_, i) => addDays(today(), i - 13));
+  const values = range.map((d) => byDate[d] ?? 0);
+  const history = `
     <div class="panel k${idx}" style="background:var(--surface-container-high);color:var(--on-bg)">
       <div class="row" style="align-items:baseline">
-        <h2 class="headline-s grow">Last 14 days</h2><span class="title-m" style="color:var(--accent)" data-total></span>
+        <h2 class="headline-s grow">Last 14 days</h2><span class="title-m" style="color:var(--accent)">${values.reduce((a, v) => a + v, 0)} pages</span>
       </div>
-      <div class="chart" data-chart></div>
-      <div class="days" data-days></div>
+      ${chart(range, values)}
     </div>
-
     <h2 class="headline section-title">Daily log</h2>
-    ${days.length === 0 ? `<p class="muted" style="margin:0 4px">Nothing logged yet. Save the page you reached today to start your log.</p>` :
+    ${days.length === 0 ? `<p class="muted" style="margin:0 4px">Nothing logged yet. Save the page you reached today on the Log tab to start your log.</p>` :
       days.map((d, i) => `<div class="entry" style="animation-delay:${Math.min(i, 10) * 0.03}s">
         <div class="amount k${idx}">+${d.read}</div>
-        <div class="grow"><div class="title-m">${esc(relDate(d.date))}</div><div class="muted" style="font-size:14px">Reached page ${d.page}</div></div>
+        <div class="grow"><div class="title-m">${esc(relDate(d.date))}</div><div class="muted body-s">Reached page ${d.page}</div></div>
         <button class="icon-btn" data-remove="${d.date}" aria-label="Remove entry">${icon('close')}</button>
-      </div>`).join('')}
+      </div>`).join('')}`;
+
+  app.innerHTML = `<section class="screen ${dir}">
+    <div class="sticky-top">
+      ${subPageBar(b.title, `<button class="icon-btn" data-edit aria-label="Edit book">${icon('edit')}</button>
+        <button class="icon-btn" data-delete aria-label="Delete book">${icon('delete')}</button>`)}
+      <nav class="tabrow">${DETAIL_TABS.map(([t, label, ic]) =>
+        `<button class="${t === tab ? 'active' : ''}" data-tab="${t}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav>
+    </div>
+    <div class="tab-content ${dir === 'none' ? 'swap' : ''}">${tab === 'overview' ? overview : tab === 'log' ? log : history}</div>
   </section>`;
 
   const $ = (sel) => app.querySelector(sel);
-  const dateInput = $('[data-date]'), pageInput = $('[data-page]'), help = $('[data-help]'), saveBtn = $('[data-save]');
+  const switchTab = (t) => location.replace(`#/book/${b.id}${t === 'overview' ? '' : '/' + t}`);
+  app.querySelectorAll('[data-tab]').forEach((el) => { el.onclick = () => switchTab(el.dataset.tab); });
+  // Swipe left/right between tabs, like the Android app.
+  let startX = null, startY = null;
+  const content = $('.tab-content');
+  content.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; startY = e.touches[0].clientY; }, { passive: true });
+  content.addEventListener('touchend', (e) => {
+    if (startX === null) return;
+    const dx = e.changedTouches[0].clientX - startX, dy = e.changedTouches[0].clientY - startY;
+    startX = null;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+    const i = DETAIL_TABS.findIndex(([t]) => t === tab) + (dx < 0 ? 1 : -1);
+    if (i >= 0 && i < DETAIL_TABS.length) switchTab(DETAIL_TABS[i][0]);
+  });
 
+  $('[data-back]').onclick = () => back('/');
+  $('[data-edit]').onclick = () => go(`/book/${b.id}/edit`);
+  $('[data-delete]').onclick = async () => {
+    const ok = await confirmDialog({ title: 'Delete this book?', text: `“${b.title}” and its whole reading log will be removed.`, confirm: 'Delete', danger: true });
+    if (!ok) return;
+    replaceBooks(books.filter((x) => x !== b));
+    navDepth = 0;
+    location.replace('#/');
+  };
+
+  if (tab === 'overview') {
+    $('[data-go-log]')?.addEventListener('click', () => switchTab('log'));
+    $('[data-copies]').onclick = () => showCopies(b.title, b.author);
+  }
+  if (tab === 'history') {
+    animateCharts();
+    app.querySelectorAll('[data-remove]').forEach((btn) => {
+      btn.onclick = () => { b.entries = b.entries.filter((e) => e.date !== btn.dataset.remove); saveBooks(); renderDetail(b, 'none', tab); };
+    });
+  }
+  if (tab === 'log') bindLog(b);
+}
+
+function bindLog(b) {
+  const $ = (sel) => app.querySelector(sel);
+  const dateInput = $('[data-date]'), pageInput = $('[data-page]'), help = $('[data-help]'), saveBtn = $('[data-save]');
   const entryFor = (date) => b.entries.find((e) => e.date === date);
   const resetPage = () => { pageInput.value = String(entryFor(dateInput.value)?.page ?? currentPage(b)); update(); };
   function update() {
@@ -386,7 +347,8 @@ function renderDetail(b, dir) {
   app.querySelectorAll('[data-bump]').forEach((btn) => {
     btn.onclick = () => {
       const base = pageInput.value === '' ? currentPage(b) : Number(pageInput.value);
-      pageInput.value = String(clamp(base + Number(btn.dataset.bump), 0, b.totalPages)); update();
+      pageInput.value = String(clamp(base + Number(btn.dataset.bump), 0, b.totalPages));
+      update();
     };
   });
   $('[data-end]').onclick = () => { pageInput.value = String(b.totalPages); update(); };
@@ -394,43 +356,64 @@ function renderDetail(b, dir) {
     const page = Number(pageInput.value), date = dateInput.value;
     logPage(b, date, page);
     toast(`Saved page ${page} · ${relDate(date)}`);
-    renderDetail(b, 'none');
+    renderDetail(b, 'none', 'log');
   };
   pageInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') pageInput.blur(); });
   resetPage();
+}
 
-  // 14-day chart
-  const byDate = Object.fromEntries(days.map((d) => [d.date, d.read]));
+/* ---------- Stats tab ---------- */
+function renderStats(dir) {
+  const perDay = {};
+  books.forEach((b) => dailyPages(b).forEach((d) => { perDay[d.date] = (perDay[d.date] || 0) + d.read; }));
   const range = Array.from({ length: 14 }, (_, i) => addDays(today(), i - 13));
-  const values = range.map((d) => byDate[d] ?? 0);
-  const max = Math.max(1, ...values);
-  $('[data-total]').textContent = `${values.reduce((a, v) => a + v, 0)} pages`;
-  $('[data-chart]').innerHTML = range.map((d, i) => `<i class="${values[i] === 0 ? 'zero' : ''} ${d === today() && values[i] > 0 ? 'today' : ''}"></i>`).join('');
-  $('[data-days]').innerHTML = range.map((d) => `<span class="${d === today() ? 'today' : ''}">${fromISO(d).toLocaleDateString(undefined, { weekday: 'narrow' })}</span>`).join('');
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    app.querySelectorAll('[data-chart] i').forEach((bar, i) => {
-      const v = values[i];
-      bar.style.height = (v === 0 ? 4 : Math.max(8, (v / max) * 100)) + '%';
-    });
-  }));
+  const values = range.map((d) => perDay[d] || 0);
+  const week = Array.from({ length: 7 }, (_, i) => perDay[addDays(today(), -i)] || 0).reduce((a, v) => a + v, 0);
+  const allTime = books.reduce((n, b) => n + currentPage(b), 0);
+  const finished = books.filter(isFinished).length;
+  const dayStreak = streakOf(new Set(Object.keys(perDay).filter((d) => perDay[d] > 0)));
+  const since = addDays(today(), -7);
+  const weekly = books
+    .map((b) => ({ b, pages: dailyPages(b).filter((d) => d.date > since).reduce((n, d) => n + d.read, 0) }))
+    .filter((x) => x.pages > 0).sort((a, b) => b.pages - a.pages);
 
-  $('[data-back]').onclick = () => back('/');
-  $('[data-edit]').onclick = () => go(`/book/${b.id}/edit`);
-  $('[data-delete]').onclick = async () => {
-    const ok = await confirmDialog({ title: 'Delete this book?', text: `“${b.title}” and its whole reading log will be removed.`, confirm: 'Delete', danger: true });
-    if (!ok) return;
-    books = books.filter((x) => x !== b); saveBooks();
-    navDepth = 0; location.replace('#/');
-  };
-  app.querySelectorAll('[data-remove]').forEach((btn) => {
-    btn.onclick = () => { b.entries = b.entries.filter((e) => e.date !== btn.dataset.remove); saveBooks(); renderDetail(b, 'none'); };
-  });
+  app.innerHTML = `<section class="screen ${dir}">
+    ${pageHeader('Stats')}
+    <div class="stats">
+      <div class="stat c0"><b>${perDay[today()] || 0}</b><span>Pages today</span></div>
+      <div class="stat c1" style="animation-delay:.05s"><b>${week}</b><span>This week</span></div>
+      <div class="stat c2" style="animation-delay:.1s"><b>${dayStreak}</b><span>Day streak</span></div>
+    </div>
+    <div class="stats two">
+      <div class="stat k0"><b>${allTime}</b><span>Pages read in total</span></div>
+      <div class="stat k2" style="animation-delay:.05s"><b>${finished} / ${books.length}</b><span>Books finished</span></div>
+    </div>
+    <div class="panel">
+      <div class="row" style="align-items:baseline">
+        <h2 class="headline-s grow">Last 14 days</h2><span class="title-m" style="color:var(--primary)">${values.reduce((a, v) => a + v, 0)} pages</span>
+      </div>
+      <div style="--accent:var(--primary)">${chart(range, values)}</div>
+    </div>
+    <div class="panel">
+      <h2 class="headline-s">Most read this week</h2>
+      ${weekly.length === 0 ? '<p class="muted">Log some pages and your top books will show up here.</p>' :
+        `<div class="weekly">${weekly.slice(0, 5).map(({ b, pages }) => `
+          <button class="weekly-row k${colorIndex(b)}" data-book="${esc(b.id)}">
+            ${badge(b, colorIndex(b), 'tiny')}
+            <div class="grow"><div class="title-m ellipsis">${esc(b.title)}</div>
+              <div class="meter"><i style="width:${(pages / weekly[0].pages) * 100}%"></i></div></div>
+            <b class="title">${pages}</b>${icon('chevron_right', 'muted')}
+          </button>`).join('')}</div>`}
+    </div>
+  </section>`;
+  bindBookLinks();
+  animateCharts();
 }
 
 /* ---------- add / edit with autofill ---------- */
-function renderEditor(book, dir) {
+function renderEditor(book, dir, initialTitle = '') {
   const form = {
-    title: book?.title ?? '', author: book?.author ?? '', releaseDate: book?.releaseDate ?? '',
+    title: book?.title ?? initialTitle, author: book?.author ?? '', releaseDate: book?.releaseDate ?? '',
     pages: book ? String(book.totalPages) : '', coverUrl: book?.coverUrl ?? null,
   };
   let filledTitle = book?.title ?? null; // typing this exact title again won't re-search
@@ -466,7 +449,7 @@ function renderEditor(book, dir) {
       <div>
         <label class="field" data-pages-field>
           <input data-pages value="${esc(form.pages)}" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off">
-          <span class="lbl">Total pages</span>${icon('book', 'lead')}
+          <span class="lbl">Total pages</span>${icon('menu_book', 'lead')}
         </label>
         <div class="help" data-pages-help></div>
       </div>
@@ -510,7 +493,7 @@ function renderEditor(book, dir) {
     filledBox.innerHTML = `<div class="filled">
       ${form.coverUrl ? badge({ title: titleIn.value, coverUrl: form.coverUrl }, 0, 'big') : ''}
       <div class="grow">
-        ${autoFilled ? `<div class="filled-title">${icon('sparkle')}Details filled in</div>
+        ${autoFilled ? `<div class="filled-title">${icon('auto_awesome')}Details filled in</div>
           <div class="muted" style="font-size:14px">Double-check them below. Edition page counts can vary.</div>` : ''}
         ${form.coverUrl ? '<button class="btn text" data-uncover style="padding:0;height:40px">Remove cover</button>' : ''}
       </div></div>`;
@@ -561,7 +544,7 @@ function renderEditor(book, dir) {
   pagesIn.addEventListener('input', () => { pagesIn.value = pagesIn.value.replace(/\D/g, '').slice(0, 6); validate(); });
   pagesIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') pagesIn.blur(); });
 
-  $('[data-close]').onclick = () => back(book ? `/book/${book.id}` : '/');
+  $('[data-close]').onclick = () => back(book ? `/book/${book.id}` : initialTitle ? '/genres' : '/');
   $('[data-save]').onclick = () => {
     triedSave = true;
     if (!validate()) return;
@@ -581,85 +564,313 @@ function renderEditor(book, dir) {
 
   setTrail(); showFilled();
   if (!book) titleIn.focus();
+  // A prefilled title (from a recommendation) starts the autofill search straight away.
+  if (initialTitle) onTitle();
 }
 
-/* ---------- book lookup (Open Library + Google Books, no key) ---------- */
-async function getJSON(url, signal) {
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
+/* ---------- Genres tab ---------- */
+const GENRES_KEY = 'booktracker.genres';
+const genreState = { analysis: store.get(GENRES_KEY), running: false, error: null };
+const signature = () => librarySignature(books, isFinished);
+const helpers = { currentPage, isFinished, dailyPages };
+
+async function analyze() {
+  if (genreState.running || !books.length) return;
+  genreState.running = true;
+  genreState.error = null;
+  if (parts()[0] === 'genres') renderGenres('none');
+  const key = getApiKey();
+  try {
+    const result = key
+      ? await analyzeWithClaude(key, books, signature(), helpers)
+      : await analyzeBasic(books, signature(), currentPage);
+    genreState.analysis = result;
+    store.set(GENRES_KEY, result);
+  } catch (e) {
+    genreState.error = e?.message || 'Something went wrong. Try again.';
+  }
+  genreState.running = false;
+  if (parts()[0] === 'genres') renderGenres('none');
 }
 
-const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
-/** Parses "May 04, 2021", "4 May 2021", "2021-05-04" etc. into ISO, or null. */
-function parseLooseDate(s) {
-  s = String(s).trim();
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  m = s.match(/^([A-Za-z]+)\.? (\d{1,2}),? (\d{4})$/);
-  if (m && MONTHS[m[1].slice(0, 3).toLowerCase()]) return `${m[3]}-${pad(MONTHS[m[1].slice(0, 3).toLowerCase()])}-${pad(m[2])}`;
-  m = s.match(/^(\d{1,2}) ([A-Za-z]+)\.? (\d{4})$/);
-  if (m && MONTHS[m[2].slice(0, 3).toLowerCase()]) return `${m[3]}-${pad(MONTHS[m[2].slice(0, 3).toLowerCase()])}-${pad(m[1])}`;
-  return null;
-}
-/** Google's "2021", "2021-05" or "2021-05-04". */
-function parseIsoPartial(s) {
-  if (/^\d{4}$/.test(s)) return `${s}-01-01`;
-  if (/^\d{4}-\d{2}$/.test(s)) return `${s}-01`;
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  return null;
-}
+function renderGenres(dir) {
+  const { analysis, running, error } = genreState;
+  const hasAi = !!getApiKey();
+  const outdated = !!analysis && analysis.librarySignature !== signature();
+  // Basic mode is free, so keep it up to date automatically. AI runs only when asked.
+  if (books.length && !hasAi && !running && !error && (!analysis || outdated)) setTimeout(analyze);
 
-async function searchOpenLibrary(q, signal) {
-  const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=8&fields=title,author_name,first_publish_year,number_of_pages_median,cover_i,publish_date`;
-  const data = await getJSON(url, signal);
-  return (data.docs || []).filter((d) => d.title).map((d) => {
-    const year = d.first_publish_year;
-    const exact = (d.publish_date || []).map(parseLooseDate).filter((x) => x && Number(x.slice(0, 4)) === year).sort()[0];
-    return {
-      title: d.title,
-      author: (d.author_name || []).join(', '),
-      releaseDate: exact || (year ? `${year}-01-01` : null),
-      pages: d.number_of_pages_median || null,
-      coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg?default=false` : null,
-    };
+  let status;
+  if (running) status = hasAi ? 'Claude is reading your library…' : 'Sorting your books…';
+  else if (hasAi && analysis?.source === 'BASIC') status = "Showing basic results. Tap Analyze for Claude's take.";
+  else if (hasAi && !analysis) status = 'Tap Analyze to let Claude sort your books and pick what to read next.';
+  else if (hasAi && outdated) status = 'Your library changed since the last analysis.';
+  else if (hasAi) status = 'Genres and picks by Claude.';
+  else status = "Genres from Open Library. Add an Anthropic API key for AI genres and personal picks.";
+
+  let body = '';
+  if (!books.length) {
+    body = `<div class="panel"><h2 class="headline-s">Add some books first</h2>
+      <p class="muted">Once you have books in your library, they'll be sorted into genres here with recommendations.</p></div>`;
+  } else {
+    body = `<div class="panel mode ${hasAi ? 'ai' : ''}">
+        <div class="row">
+          <div class="mode-icon">${icon(hasAi ? 'psychology' : 'category')}</div>
+          <div class="grow"><div class="title">${hasAi ? `AI: ${MODEL_NAME}` : 'Basic mode'}</div><div class="muted body-m">${status}</div></div>
+        </div>
+        ${running ? '<div class="center" style="margin-top:14px"><div class="loader big"></div></div>' : `
+        <div class="row" style="margin-top:14px;gap:10px">
+          <button class="btn filled grow" data-analyze>${icon(analysis ? 'refresh' : 'auto_awesome')}${!analysis ? 'Analyze' : outdated ? 'Update' : 'Re-analyze'}</button>
+          ${hasAi ? '' : `<button class="btn" data-setup-ai>${icon('key')}Set up AI</button>`}
+        </div>`}
+      </div>
+      ${error ? `<div class="panel error-panel row">${icon('error')}<span>${esc(error)}</span></div>` : ''}`;
+
+    if (analysis) {
+      if (analysis.summary) {
+        body += `<div class="panel taste"><div class="row" style="gap:8px">${icon('auto_awesome')}<span class="title">Your reading taste</span></div>
+          <p class="body-l" style="margin:8px 0 0">${esc(analysis.summary)}</p></div>`;
+      }
+      // Group by main genre in the fixed genre order; books added since go last.
+      const groups = new Map();
+      books.forEach((b) => {
+        const g = analysis.bookGenres[b.id]?.[0] || 'Not sorted yet';
+        if (!groups.has(g)) groups.set(g, []);
+        groups.get(g).push(b);
+      });
+      const order = [...GENRES, 'Not sorted yet'];
+      [...groups.entries()].sort((a, b) => (order.indexOf(a[0]) - order.indexOf(b[0])) || (b[1].length - a[1].length)).forEach(([genre, list]) => {
+        body += `<div class="panel genre">
+          <div class="row"><h2 class="headline-s grow">${esc(genre)}</h2><span class="count">${list.length}</span></div>
+          <div class="shelf">${list.map((b) => `<button class="shelf-book" data-book="${esc(b.id)}">
+            ${badge(b, colorIndex(b), 'shelf-badge')}
+            <span class="label clamp2">${esc(b.title)}</span>
+            ${analysis.bookGenres[b.id]?.[1] ? `<span class="body-s muted ellipsis">+ ${esc(analysis.bookGenres[b.id][1])}</span>` : ''}
+          </button>`).join('')}</div>
+        </div>`;
+      });
+      if (analysis.recommendations.length) {
+        body += `<h2 class="headline section-title">Recommended for you</h2>` + analysis.recommendations.map((r, i) => {
+          const idx = Math.max(0, GENRES.indexOf(r.genre)) % 3;
+          return `<div class="panel rec" data-rec="${i}" style="animation-delay:${Math.min(i, 8) * 0.04}s">
+            <div class="row" style="align-items:flex-start">
+              <div data-rec-cover>${badge({ title: r.title }, idx, 'rec-badge')}</div>
+              <div class="grow">
+                <h3 class="title clamp2">${esc(r.title)}</h3>
+                <div class="muted body-m">${esc([r.author, r.year].filter(Boolean).join(' · '))}</div>
+                <div class="pills"><span class="pill-tag k${idx}" style="background:var(--accent);color:var(--on-accent)">${esc(r.genre)}</span><span data-rec-access></span></div>
+              </div>
+            </div>
+            ${r.reason ? `<p class="body-l" style="margin:12px 0 0">${esc(r.reason)}</p>` : ''}
+            <div class="row" style="gap:10px;margin-top:14px">
+              <button class="btn grow" data-copy="${i}">${icon('download')}Get a copy</button>
+              <button class="btn outline grow" data-add-rec="${i}">${icon('library_add')}Add to books</button>
+            </div>
+          </div>`;
+        }).join('');
+      }
+    }
+  }
+
+  app.innerHTML = `<section class="screen ${dir}">${pageHeader('Genres', 'Your books sorted by genre, and what to read next')}${body}</section>`;
+  bindBookLinks();
+  app.querySelector('[data-analyze]')?.addEventListener('click', analyze);
+  app.querySelector('[data-setup-ai]')?.addEventListener('click', () => go('/settings/ai'));
+  const recs = analysis?.recommendations || [];
+  app.querySelectorAll('[data-copy]').forEach((el) => { el.onclick = () => { const r = recs[el.dataset.copy]; showCopies(r.title, r.author); }; });
+  app.querySelectorAll('[data-add-rec]').forEach((el) => { el.onclick = () => go('/add/' + encodeURIComponent(recs[el.dataset.addRec].title)); });
+  // Covers and free/borrow badges load in as Open Library answers.
+  app.querySelectorAll('[data-rec]').forEach(async (card) => {
+    const r = recs[card.dataset.rec];
+    const c = await findCopies(r.title, r.author);
+    if (!card.isConnected) return;
+    if (c.coverUrl) card.querySelector('[data-rec-cover]').innerHTML = badge({ title: r.title, coverUrl: c.coverUrl }, Math.max(0, GENRES.indexOf(r.genre)) % 3, 'rec-badge');
+    if (c.isFreeDownload || c.isBorrowable) {
+      card.querySelector('[data-rec-access]').innerHTML = `<span class="pill-tag c2">${c.isFreeDownload ? 'Free download' : 'Borrow free'}</span>`;
+    }
   });
 }
 
-async function searchGoogle(q, signal) {
-  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=10&printType=books&fields=items(volumeInfo(title,authors,publishedDate,pageCount,imageLinks/thumbnail))`;
-  const data = await getJSON(url, signal);
-  return (data.items || []).map((it) => it.volumeInfo).filter((v) => v?.title).map((v) => ({
-    title: v.title,
-    author: (v.authors || []).join(', '),
-    releaseDate: v.publishedDate ? parseIsoPartial(v.publishedDate) : null,
-    pages: v.pageCount || null,
-    coverUrl: v.imageLinks?.thumbnail ? v.imageLinks.thumbnail.replace('http://', 'https://').replace('&edge=curl', '') : null,
-  }));
+/** Bottom sheet with free, legal places to read, borrow or download a book. */
+async function showCopies(title, author) {
+  const heading = `<h2 class="headline-s">Get a copy</h2><p class="title-m muted" style="margin:0 0 16px">${esc([title, author].filter(Boolean).join(' · '))}</p>`;
+  const body = openSheet(`${heading}<div class="center" style="padding:24px"><div class="loader big"></div></div>`);
+  const c = await findCopies(title, author).catch(() => copiesFrom(null, [title, author].filter(Boolean).join(' ')));
+  if (!body.isConnected) return;
+  const link = (ic, name, sub, url, cls = '') => `<a class="link-row ${cls}" href="${esc(url)}" target="_blank" rel="noopener">
+    ${icon(ic)}<div class="grow"><div class="title-m">${name}</div><div class="body-s">${sub}</div></div>${icon('open_in_new')}</a>`;
+  body.innerHTML = heading + `<div class="links">
+    ${c.isFreeDownload && c.archiveUrl ? link('download', 'Download free', 'Public domain · PDF & EPUB on the Internet Archive', c.archiveUrl, 'c0') : ''}
+    ${c.isBorrowable ? link('menu_book', 'Borrow free', 'Read online with a free Open Library account', c.openLibraryUrl, 'c1') : ''}
+    ${link('link', 'Open Library', 'Editions, ebooks and libraries near you', c.openLibraryUrl)}
+    ${link('download', 'Project Gutenberg', 'Free ebooks of classic, public-domain books', c.gutenbergUrl)}
+    ${link('open_in_new', 'Google Books', 'Preview or buy the ebook', c.googleBooksUrl)}
+  </div>
+  <p class="body-s muted sheet-note">These are free, legal sources. Newer books are usually borrowed from a library or bought; free downloads are for books in the public domain.</p>`;
 }
 
-const norm = (s) => String(s).toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-/** Merges results for the same book, preferring a precise date over a year-only one. */
-function mergeResults(primary, secondary) {
-  const out = new Map();
-  for (const s of [...primary, ...secondary]) {
-    const key = norm(s.title) + '|' + norm(s.author.split(',')[0]);
-    const e = out.get(key);
-    if (!e) { out.set(key, s); continue; }
-    const yearOnly = e.releaseDate?.endsWith('-01-01');
-    if (!e.releaseDate || (yearOnly && s.releaseDate && s.releaseDate.slice(0, 4) === e.releaseDate.slice(0, 4) && !s.releaseDate.endsWith('-01-01'))) e.releaseDate = s.releaseDate;
-    e.pages ??= s.pages;
-    e.coverUrl ??= s.coverUrl;
+/* ---------- Settings tab ---------- */
+const PREVIEW_BOOK = {
+  id: 'preview', title: 'The Hobbit', author: 'J.R.R. Tolkien', releaseDate: '1937-09-21', totalPages: 310, coverUrl: null,
+  entries: [{ date: addDays(today(), -1), page: 96 }, { date: today(), page: 142 }], createdAt: 0,
+};
+const preview = () => `<div class="preview"><div class="label muted" style="margin:0 4px 8px">Preview</div>${bookCard(PREVIEW_BOOK, 0, 0, false)}</div>`;
+const labelOf = (list, v) => (list.find((x) => x[0] === v) || list[0])[1];
+
+function navRow(ic, title, sub, cls, route) {
+  return `<button class="nav-row" data-route="${route}"><span class="nav-icon ${cls}">${icon(ic)}</span>
+    <span class="grow"><span class="title block">${title}</span><span class="body-m muted block">${sub}</span></span>${icon('chevron_right', 'muted')}</button>`;
+}
+
+function renderSettings(dir) {
+  const a = appearance;
+  app.innerHTML = `<section class="screen ${dir}">
+    ${pageHeader('Settings')}
+    ${preview()}
+    <div class="stack" style="margin-top:14px">
+      ${navRow('palette', 'Theme & colors', `${labelOf(THEME_MODES, a.theme)} · ${labelOf(PALETTES, a.palette)}`, 'c0', 'theme')}
+      ${navRow('text_fields', 'Text', `${labelOf(TEXT_SIZES, a.textSize)} · ${labelOf(FONTS, a.font)}${a.bold ? ' · Bold' : ''}`, 'c1', 'text')}
+      ${navRow('style', 'Style', `${labelOf(CORNERS, a.corners)} corners · ${labelOf(ICON_STYLES, a.icons)} icons`, 'c2', 'style')}
+      ${navRow('psychology', 'AI', getApiKey() ? 'Claude connected' : 'Not set up · genres use basic mode', 'k1 nav-soft', 'ai')}
+      ${navRow('save', 'Backups', 'Export and restore your books (CSV or JSON)', 'k0 nav-soft', 'backups')}
+      <button class="btn outline big" data-reset>${icon('restart_alt')}Reset look to defaults</button>
+      <p class="body-s muted">Book Tracker ${VERSION} (web)</p>
+    </div>
+  </section>`;
+  app.querySelectorAll('[data-route]').forEach((el) => { el.onclick = () => go('/settings/' + el.dataset.route); });
+  app.querySelector('[data-reset]').onclick = () => { setAppearance(null); renderSettings('none'); toast('Look reset to defaults'); };
+}
+
+function choice(value, label, selected, extra = '') {
+  return `<button class="choice ${selected ? 'selected' : ''}" data-value="${value}" ${extra}>${label}</button>`;
+}
+
+function renderSettingsPage(page, dir) {
+  const a = appearance;
+  let title, body;
+  if (page === 'theme') {
+    title = 'Theme & colors';
+    body = `${preview()}
+      <div class="panel"><h2 class="headline-s">Theme</h2>
+        <div class="big-choices" data-group="theme">${THEME_MODES.map(([v, l, ic]) =>
+          `<button class="big-choice ${a.theme === v ? 'selected' : ''}" data-value="${v}">${icon(ic)}<span class="label">${l}</span></button>`).join('')}</div></div>
+      <div class="panel"><h2 class="headline-s">Colors</h2>
+        <div class="swatches" data-group="palette">${PALETTES.map(([v, l]) => {
+          const [p, s, t] = paletteSwatch(v, isDark());
+          return `<button class="swatch ${a.palette === v ? 'selected' : ''}" data-value="${v}" aria-label="${l}">
+            <span class="swatch-circle"><i style="background:${p}"></i><i style="background:${s}"></i><i style="background:${t}"></i>
+            ${a.palette === v ? `<span class="swatch-check">${icon('check')}</span>` : ''}</span><span class="label">${l}</span></button>`;
+        }).join('')}</div></div>`;
+  } else if (page === 'text') {
+    title = 'Text';
+    body = `<div class="panel k0" style="background:var(--primary-container);color:var(--on-primary-container)">
+        <div class="headline">The Hobbit</div><div class="title-m">by J.R.R. Tolkien</div>
+        <p class="body-l" style="margin:8px 0 0">In a hole in the ground there lived a hobbit.</p></div>
+      <div class="panel"><h2 class="headline-s">Text size</h2>
+        <div class="choices" data-group="textSize">${TEXT_SIZES.map(([v, l]) => choice(v, `${icon(a.textSize === v ? 'check' : 'format_size')}${l}`, a.textSize === v)).join('')}</div></div>
+      <div class="panel"><h2 class="headline-s">Font</h2>
+        <div class="choices three" data-group="font">${FONTS.map(([v, l, stack]) => choice(v, `<span style="font-family:${esc(stack)};font-weight:700">${l}</span>`, a.font === v)).join('')}</div></div>
+      <div class="panel row"><div class="grow"><h2 class="headline-s">Bold text</h2><div class="muted body-m">Heavy headings and numbers</div></div>
+        <label class="switch"><input type="checkbox" data-bold ${a.bold ? 'checked' : ''}><span></span></label></div>`;
+  } else if (page === 'style') {
+    title = 'Style';
+    loadFonts(['outlined', 'rounded', 'sharp']); // to preview every icon style
+    body = `${preview()}
+      <div class="panel"><h2 class="headline-s">Corners</h2>
+        <div class="big-choices" data-group="corners">${CORNERS.map(([v, l, scale]) =>
+          `<button class="big-choice ${a.corners === v ? 'selected' : ''}" data-value="${v}"><span class="corner-demo" style="border-radius:${Math.round(18 * scale)}px"></span><span class="label">${l}</span></button>`).join('')}</div></div>
+      <div class="panel"><h2 class="headline-s">Icons</h2>
+        <div class="stack" data-group="icons">${ICON_STYLES.map(([v, l]) =>
+          `<button class="icon-choice ${a.icons === v ? 'selected' : ''}" data-value="${v}"><span class="title-m grow">${l}</span>
+            <span class="icon-sample" data-icons="${v}">${['menu_book', 'settings', 'delete', 'person'].map((n) => icon(n)).join('')}</span></button>`).join('')}</div></div>`;
+  } else if (page === 'ai') {
+    title = 'AI';
+    const key = getApiKey();
+    body = `<div class="panel k1" style="background:var(--secondary-container);color:var(--on-secondary-container)">
+        <div class="row" style="gap:10px">${icon('psychology')}<span class="headline-s">${MODEL_NAME}</span></div>
+        <p class="body-l" style="margin:8px 0 0">The Genres tab can use Claude, Anthropic's AI, to sort your library into genres, describe your reading taste and recommend books you'll like. It sends your books' titles, authors and reading progress to Anthropic when you tap Analyze.</p></div>
+      <div class="panel"><h2 class="headline-s">Anthropic API key</h2>
+        ${key ? `<div class="row" style="margin:12px 0"><span style="color:var(--primary)">${icon('check_circle')}</span>
+          <span class="title-m grow">Connected · ${esc(key.length > 12 ? key.slice(0, 7) + '…' + key.slice(-4) : 'saved')}</span>
+          <button class="btn text" data-remove-key>Remove</button></div>` : ''}
+        <div style="margin-top:12px"><label class="field">
+          <input type="password" data-key autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…">
+          <span class="lbl">${key ? 'Replace key' : 'Paste your API key'}</span>${icon('key', 'lead')}
+          <span class="trail"><button class="icon-btn" data-show aria-label="Show key">${icon('visibility')}</button></span>
+        </label><div class="help" data-key-help></div></div>
+        <button class="btn big filled" data-save-key disabled style="margin-top:8px">Save key</button>
+        <a class="btn outline big" style="margin-top:8px" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">${icon('open_in_new')}Get a key from the Anthropic Console</a>
+      </div>
+      <div class="panel"><h2 class="headline-s">Good to know</h2>
+        <div class="note">${icon('lock')}<span>Your key is stored only in this browser on this device, and is sent only to Anthropic.</span></div>
+        <div class="note">${icon('bar_chart')}<span>Each analysis is billed to your Anthropic account, usually a few cents to about 25¢ depending on how many books you have. It only runs when you tap Analyze.</span></div>
+        <div class="note">${icon('category')}<span>Without a key, Genres still works in basic mode using Open Library's subject tags.</span></div>
+      </div>`;
+  } else if (page === 'backups') {
+    title = 'Backups';
+    body = `<div class="panel"><h2 class="headline-s">Save a copy</h2>
+        <p class="muted body-m">Your books live only in this browser. Save a backup now and then, especially before clearing Safari's data.</p>
+        <button class="btn big filled" data-csv>${icon('download')}Export CSV (spreadsheet)</button>
+        <button class="btn big" data-json style="margin-top:8px">${icon('save')}Export full backup (JSON)</button></div>
+      <div class="panel"><h2 class="headline-s">Restore</h2>
+        <p class="muted body-m">Restore a CSV or JSON backup from this web app, or a CSV backup from the Android app.</p>
+        <button class="btn big outline" data-restore>${icon('upload')}Restore from a backup</button></div>
+      <p class="body-s muted" style="margin:0 4px">Automatic scheduled backups are Android-only: browsers can't run tasks in the background or save into folders on their own.</p>`;
+  } else {
+    location.replace('#/settings');
+    return;
   }
-  return [...out.values()];
-}
 
-async function searchBooks(q, signal) {
-  const [ol, g] = await Promise.allSettled([searchOpenLibrary(q, signal), searchGoogle(q, signal)]);
-  return mergeResults(ol.value || [], g.value || []).slice(0, 8);
+  app.innerHTML = `<section class="screen ${dir}">${subPageBar(title)}<div class="stack-l">${body}</div></section>`;
+  app.querySelector('[data-back]').onclick = () => back('/settings');
+
+  const rerender = () => renderSettingsPage(page, 'none');
+  app.querySelectorAll('[data-group]').forEach((group) => {
+    group.querySelectorAll('[data-value]').forEach((btn) => {
+      btn.onclick = () => { setAppearance({ [group.dataset.group]: btn.dataset.value }); rerender(); };
+    });
+  });
+  const bold = app.querySelector('[data-bold]');
+  if (bold) bold.onchange = () => { setAppearance({ bold: bold.checked }); };
+
+  if (page === 'ai') {
+    const input = app.querySelector('[data-key]'), help = app.querySelector('[data-key-help]'), save = app.querySelector('[data-save-key]');
+    input.oninput = () => {
+      input.value = input.value.trim();
+      help.textContent = input.value && !input.value.startsWith('sk-ant-') ? 'Anthropic keys start with sk-ant-' : '';
+      save.disabled = input.value.length <= 20;
+    };
+    app.querySelector('[data-show]').onclick = (e) => {
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      e.currentTarget.innerHTML = icon(show ? 'visibility_off' : 'visibility');
+    };
+    save.onclick = () => { setApiKey(input.value); toast('Saved. Open Genres and tap Analyze.'); rerender(); };
+    app.querySelector('[data-remove-key]')?.addEventListener('click', () => { setApiKey(null); toast('API key removed'); rerender(); });
+  }
+  if (page === 'backups') {
+    app.querySelector('[data-csv]').onclick = () => download(booksToCsv(books), `booktracker-backup-${today()}.csv`, 'text/csv');
+    app.querySelector('[data-json]').onclick = () => download(JSON.stringify({ version: 1, books }, null, 2), `booktracker-backup-${today()}.json`, 'application/json');
+    app.querySelector('[data-restore]').onclick = () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.csv,.json,text/csv,application/json,text/plain';
+      input.onchange = async () => {
+        try {
+          const restored = booksFromBackup(await input.files[0].text());
+          const ok = await confirmDialog({ title: 'Restore this backup?', text: `Your current books will be replaced with the ${restored.length} book${restored.length === 1 ? '' : 's'} in the backup.`, confirm: 'Restore' });
+          if (!ok) return;
+          replaceBooks(restored);
+          toast(`Restored ${restored.length} books`);
+        } catch { toast("That doesn't look like a Book Tracker backup"); }
+      };
+      input.click();
+    };
+  }
 }
 
 /* ---------- start ---------- */
+applyAppearance();
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }

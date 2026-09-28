@@ -1,8 +1,11 @@
 // Offline support: app files are network-first (so updates show up right
 // away) with a cached fallback; covers and fonts are cache-first.
-const SHELL_CACHE = 'booktracker-shell-v1';
+const SHELL_CACHE = 'booktracker-shell-v2';
 const ASSET_CACHE = 'booktracker-assets-v1';
-const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/apple-touch-icon.png'];
+const SHELL = [
+  './', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/apple-touch-icon.png',
+  'js/util.js', 'js/data.js', 'js/theme.js', 'js/ai.js', 'js/lookup.js', 'vendor/anthropic-sdk-0.128.0.mjs',
+];
 const ASSET_HOSTS = ['covers.openlibrary.org', 'archive.org', 'books.google.com', 'books.googleusercontent.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 const MAX_ASSETS = 300;
 
@@ -50,5 +53,5 @@ self.addEventListener('fetch', (event) => {
       }),
     );
   }
-  // Everything else (book search APIs) goes straight to the network.
+  // Everything else (book search APIs, Claude) goes straight to the network.
 });
