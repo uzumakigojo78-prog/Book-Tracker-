@@ -80,8 +80,10 @@ fun BookEditorScreen(
     book: Book?,
     onClose: () -> Unit,
     onSave: (BookDetails) -> Unit,
+    initialTitle: String = "",
 ) {
-    var title by rememberSaveable { mutableStateOf(book?.title ?: "") }
+    // A prefilled title (e.g. from a recommendation) starts the autofill search straight away.
+    var title by rememberSaveable { mutableStateOf(book?.title ?: initialTitle) }
     var author by rememberSaveable { mutableStateOf(book?.author ?: "") }
     var releaseDate by rememberSaveable { mutableStateOf(book?.releaseDate) }
     var pagesText by rememberSaveable { mutableStateOf(book?.totalPages?.toString() ?: "") }
