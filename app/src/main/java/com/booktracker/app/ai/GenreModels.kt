@@ -32,12 +32,15 @@ data class GenreAnalysis(
     val createdAt: Long,
     /** Fingerprint of the library when this was made, to tell when it's out of date. */
     val librarySignature: String,
+    /** Which AI made it, e.g. "Gemini · gemini-2.5-flash" (AI mode only). */
+    val madeBy: String? = null,
 ) {
     fun toJson(): String = JSONObject()
         .put("source", source.name)
         .put("summary", summary ?: JSONObject.NULL)
         .put("createdAt", createdAt)
         .put("librarySignature", librarySignature)
+        .put("madeBy", madeBy ?: JSONObject.NULL)
         .put("bookGenres", JSONObject().apply { bookGenres.forEach { (id, g) -> put(id, JSONArray(g)) } })
         .put("recommendations", JSONArray().apply {
             recommendations.forEach { r ->
@@ -70,6 +73,7 @@ data class GenreAnalysis(
                 },
                 createdAt = o.optLong("createdAt"),
                 librarySignature = o.optString("librarySignature"),
+                madeBy = if (o.isNull("madeBy")) null else o.optString("madeBy"),
             )
         }
     }

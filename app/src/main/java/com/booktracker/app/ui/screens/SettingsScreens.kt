@@ -66,7 +66,7 @@ enum class SettingsPage { APPEARANCE, TEXT, STYLE, AI, BACKUPS }
 @Composable
 fun SettingsScreen(
     appearanceSettings: AppearanceSettings,
-    aiConnected: Boolean,
+    aiConnected: String?,
     onOpen: (SettingsPage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -109,7 +109,7 @@ fun SettingsScreen(
         item {
             NavRow(
                 AppIcons.Psychology, "AI",
-                if (aiConnected) "Claude connected" else "Not set up · genres use basic mode",
+                aiConnected ?: "Not set up · genres use basic mode",
                 c.secondaryContainer, c.onSecondaryContainer,
             ) { onOpen(SettingsPage.AI) }
         }

@@ -18,11 +18,13 @@ indicators and springy motion.
   and your current reading streak
 - **Last 14 days chart** and a full day-by-day reading log
 - Quick `+1 / +5 / +10 / +25` buttons and an `END` button for finishing a book
-- **Genres tab with AI**: sorts your books into genres and recommends what to read next.
-  With your own [Anthropic API key](https://console.anthropic.com/settings/keys) (Settings → AI),
-  Claude Opus 5 reads your library, describes your taste and picks 8 books with a reason for each.
-  Without a key it still works in basic mode using Open Library's subject tags.
-  Usage is billed to your Anthropic account and only runs when you tap Analyze.
+- **Genres tab with AI**: sorts your books into genres, describes your taste and recommends
+  books to read next. Bring your own API key from the AI service you like (Settings → AI):
+  **Claude, Gemini, Grok, Kimi, ChatGPT, DeepSeek, Mistral, OpenRouter, Groq**, or any other
+  service with an OpenAI-compatible API (enter its base URL and model). Each service keeps
+  its own key and model, and you can change the model name. Without a key it still works in
+  basic mode using Open Library's subject tags. Usage is billed by the service you choose and
+  only runs when you tap Analyze.
 - **Get a copy**: links for any book or recommendation to free, legal sources:
   public-domain downloads and free borrowing via Open Library / the Internet Archive,
   Project Gutenberg, and Google Books.

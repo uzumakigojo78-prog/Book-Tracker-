@@ -128,7 +128,7 @@ fun BookTrackerApp(
     genreViewModel: GenreViewModel = viewModel(),
 ) {
     val books by viewModel.books.collectAsStateWithLifecycle()
-    val aiKey by genreViewModel.apiKey.collectAsStateWithLifecycle()
+    val aiConfig by genreViewModel.aiConfig.collectAsStateWithLifecycle()
     val loaded by viewModel.loaded.collectAsStateWithLifecycle()
     var route by rememberSaveable { mutableStateOf(LIBRARY) }
 
@@ -205,7 +205,7 @@ fun BookTrackerApp(
 
                 current == SETTINGS -> SettingsScreen(
                     appearanceSettings = appearanceSettings,
-                    aiConnected = aiKey != null,
+                    aiConnected = aiConfig?.displayName,
                     onOpen = { page -> route = SETTINGS_PAGE + page.name },
                     modifier = tabModifier,
                 )
