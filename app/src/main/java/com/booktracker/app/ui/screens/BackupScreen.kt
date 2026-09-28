@@ -1,5 +1,7 @@
 package com.booktracker.app.ui.screens
 
+import com.booktracker.app.ui.theme.AppIcons
+import com.booktracker.app.ui.theme.LocalAppearance
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -24,15 +26,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.BatteryChargingFull
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.CloudDone
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.Restore
-import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -186,8 +179,8 @@ fun BackupScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
-                title = { Text("Backups", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } },
+                title = { Text("CSV backups", style = MaterialTheme.typography.headlineSmall, fontWeight = LocalAppearance.current.heavyWeight) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(AppIcons.ArrowBack, "Back") } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
@@ -256,7 +249,7 @@ fun BackupScreen(
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Text("Permissions", style = MaterialTheme.typography.headlineSmall)
                     PermissionRow(
-                        icon = Icons.Rounded.Folder,
+                        icon = AppIcons.Folder,
                         title = "Backup folder",
                         detail = if (folderOk) "Saving to “${BackupManager.folderName(context, state.folderUri) ?: "chosen folder"}” on this phone"
                         else "Pick a folder on your phone where backups are saved",
@@ -265,7 +258,7 @@ fun BackupScreen(
                         onClick = { folderLauncher.launch(null) },
                     )
                     PermissionRow(
-                        icon = Icons.Rounded.BatteryChargingFull,
+                        icon = AppIcons.BatteryChargingFull,
                         title = "Battery",
                         detail = if (batteryOk) "Unrestricted: backups run on time"
                         else "Battery saving can delay or skip backups",
@@ -290,7 +283,7 @@ fun BackupScreen(
                 shapes = ButtonDefaults.shapes(),
                 modifier = Modifier.fillMaxWidth().height(64.dp),
             ) {
-                Icon(Icons.Rounded.Save, null)
+                Icon(AppIcons.Save, null)
                 Spacer(Modifier.width(10.dp))
                 Text(if (busy) "Backing up…" else "Back up now", style = MaterialTheme.typography.titleMedium)
             }
@@ -298,7 +291,7 @@ fun BackupScreen(
                 onClick = { restoreLauncher.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel", "application/octet-stream")) },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
             ) {
-                Icon(Icons.Rounded.Restore, null)
+                Icon(AppIcons.Restore, null)
                 Spacer(Modifier.width(10.dp))
                 Text("Restore from a CSV backup", style = MaterialTheme.typography.titleSmall)
             }
@@ -314,7 +307,7 @@ fun BackupScreen(
     pendingRestore?.let { restored ->
         AlertDialog(
             onDismissRequest = { pendingRestore = null },
-            icon = { Icon(Icons.Rounded.Restore, null) },
+            icon = { Icon(AppIcons.Restore, null) },
             title = { Text("Restore this backup?") },
             text = { Text("Your current books will be replaced with the ${restored.size} book${if (restored.size == 1) "" else "s"} in the backup.") },
             confirmButton = {
@@ -347,13 +340,13 @@ private fun StatusLine(lastAt: Long?, file: String?, books: Int, error: String?,
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (error != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                Icon(AppIcons.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.CloudDone, null, modifier = Modifier.size(20.dp))
+            Icon(AppIcons.CloudDone, null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Text(
                 if (lastAt != null) "Last backup ${friendlyTime(lastAt)} · $books book${if (books == 1) "" else "s"}" else "No backups yet",
@@ -408,7 +401,7 @@ private fun PermissionRow(
                 ),
         ) {
             Icon(
-                if (granted) Icons.Rounded.CheckCircle else icon,
+                if (granted) AppIcons.CheckCircle else icon,
                 null,
                 tint = if (granted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onErrorContainer,
             )

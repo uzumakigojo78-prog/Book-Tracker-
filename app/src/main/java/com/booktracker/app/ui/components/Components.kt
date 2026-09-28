@@ -1,5 +1,6 @@
 package com.booktracker.app.ui.components
 
+import com.booktracker.app.ui.theme.LocalAppearance
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -154,7 +155,7 @@ fun BookBadge(title: String, index: Int, coverUrl: String? = null, width: Dp = 6
             Text(
                 text = title.trim().firstOrNull()?.uppercase() ?: "?",
                 color = fg,
-                fontWeight = FontWeight.Black,
+                fontWeight = LocalAppearance.current.heavyWeight,
                 fontSize = (width.value * 0.5f).sp,
             )
         }
