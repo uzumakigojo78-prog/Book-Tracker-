@@ -4,13 +4,14 @@ import com.booktracker.app.ai.AiException
 import com.booktracker.app.ai.AnalysisSource
 import com.booktracker.app.ai.ClaudeGenreAi
 import com.booktracker.app.ai.GenreAnalysis
-import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.net.InetSocketAddress
+import java.net.InetAddress
+import java.net.ServerSocket
+import kotlin.concurrent.thread
 import java.time.LocalDate
 
 class ClaudeGenreAiTest {
@@ -53,40 +54,77 @@ class ClaudeGenreAiTest {
 
     @Test
     fun sendsExpectedRequestThroughSdk() {
-        var body = ""
-        var beta = ""
-        var apiKey = ""
-        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/v1/messages") { ex ->
-            body = ex.requestBody.readBytes().decodeToString()
-            beta = ex.requestHeaders.getFirst("anthropic-beta") ?: ""
-            apiKey = ex.requestHeaders.getFirst("x-api-key") ?: ""
-            val message = JSONObject()
-                .put("id", "msg_test").put("type", "message").put("role", "assistant").put("model", "claude-opus-5")
-                .put("content", org.json.JSONArray().put(JSONObject().put("type", "text").put("text", reply)))
-                .put("stop_reason", "end_turn").put("stop_sequence", JSONObject.NULL)
-                .put("usage", JSONObject().put("input_tokens", 10).put("output_tokens", 20))
-                .toString().toByteArray()
-            ex.responseHeaders.add("content-type", "application/json")
-            ex.sendResponseHeaders(200, message.size.toLong())
-            ex.responseBody.use { it.write(message) }
+        val message = JSONObject()
+            .put("id", "msg_test").put("type", "message").put("role", "assistant").put("model", "claude-opus-5")
+            .put("content", org.json.JSONArray().put(JSONObject().put("type", "text").put("text", reply)))
+            .put("stop_reason", "end_turn").put("stop_sequence", JSONObject.NULL)
+            .put("usage", JSONObject().put("input_tokens", 10).put("output_tokens", 20))
+            .toString()
+        val server = OneShotHttpServer(message)
+        val result = runBlocking {
+            ClaudeGenreAi("sk-test", "http://127.0.0.1:${server.port}").analyze(books, "sig")
         }
-        server.start()
-        try {
-            val result = runBlocking {
-                ClaudeGenreAi("sk-test", "http://127.0.0.1:${server.address.port}").analyze(books, "sig")
+        server.join()
+        val sent = JSONObject(server.body)
+        assertEquals("/v1/messages", server.path)
+        assertEquals("claude-opus-5", sent.getString("model"))
+        assertEquals("default", sent.getString("fallbacks"))
+        assertTrue(server.headers["anthropic-beta"].orEmpty().contains("server-side-fallback-2026-07-01"))
+        assertEquals("sk-test", server.headers["x-api-key"])
+        assertTrue(sent.getJSONArray("messages").getJSONObject(0).toString().contains("The Hobbit"))
+        assertEquals(2, result.recommendations.size)
+    }
+}
+
+/** Minimal HTTP server that answers a single POST with [response] and records the request. */
+private class OneShotHttpServer(response: String) {
+    private val socket = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
+    val port: Int = socket.localPort
+    var path = ""
+    var body = ""
+    val headers = mutableMapOf<String, String>()
+    private val thread = thread {
+        socket.use { server ->
+            server.accept().use { conn ->
+                val input = conn.getInputStream().buffered()
+                fun readLine(): String {
+                    val sb = StringBuilder()
+                    while (true) {
+                        val c = input.read()
+                        if (c == -1 || c == '\n'.code) break
+                        if (c != '\r'.code) sb.append(c.toChar())
+                    }
+                    return sb.toString()
+                }
+                path = readLine().split(" ").getOrElse(1) { "" }
+                while (true) {
+                    val line = readLine()
+                    if (line.isEmpty()) break
+                    val i = line.indexOf(':')
+                    if (i > 0) headers[line.substring(0, i).trim().lowercase()] = line.substring(i + 1).trim()
+                }
+                val length = headers["content-length"]?.toInt() ?: 0
+                val bytes = ByteArray(length)
+                var read = 0
+                while (read < length) {
+                    val n = input.read(bytes, read, length - read)
+                    if (n < 0) break
+                    read += n
+                }
+                body = bytes.decodeToString()
+                val payload = response.toByteArray()
+                val out = conn.getOutputStream()
+                out.write(
+                    ("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${payload.size}\r\n" +
+                        "Connection: close\r\n\r\n").toByteArray()
+                )
+                out.write(payload)
+                out.flush()
             }
-            val sent = JSONObject(body)
-            assertEquals("claude-opus-5", sent.getString("model"))
-            assertEquals("default", sent.getString("fallbacks"))
-            assertTrue(beta.contains("server-side-fallback-2026-07-01"))
-            assertEquals("sk-test", apiKey)
-            assertTrue(sent.getJSONArray("messages").getJSONObject(0).toString().contains("The Hobbit"))
-            assertEquals(2, result.recommendations.size)
-        } finally {
-            server.stop(0)
         }
     }
+
+    fun join() = thread.join(5000)
 }
 
 class OpenLibraryAiTest {
