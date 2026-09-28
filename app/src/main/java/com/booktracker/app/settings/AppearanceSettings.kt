@@ -65,7 +65,11 @@ class AppearanceSettings(context: Context) {
     /** A saved order, with any missing entries appended so new tabs/sections always appear. */
     private inline fun <reified T : Enum<T>> order(key: String, default: List<T>): List<T> {
         val saved = prefs.getString(key, null)?.split(",")?.mapNotNull { n -> enumValues<T>().firstOrNull { it.name == n } }.orEmpty().distinct()
-        return saved + default.filter { it !in saved }
+        if (saved.isEmpty()) return default
+        // Items added in an update slot in where they'd be by default.
+        val out = saved.toMutableList()
+        default.forEachIndexed { i, item -> if (item !in out) out.add(i.coerceAtMost(out.size), item) }
+        return out
     }
 
     private fun put(key: String, value: String) = prefs.edit().putString(key, value).apply()

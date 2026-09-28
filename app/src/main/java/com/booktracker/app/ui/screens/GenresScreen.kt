@@ -2,6 +2,8 @@ package com.booktracker.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +60,7 @@ import com.booktracker.app.ai.Recommendation
 import com.booktracker.app.ai.librarySignature
 import com.booktracker.app.data.Book
 import com.booktracker.app.data.BookDetails
+import com.booktracker.app.ui.components.BuySection
 import com.booktracker.app.ui.components.ButtonText
 import com.booktracker.app.ui.components.BookBadge
 import com.booktracker.app.ui.components.SectionCard
@@ -415,7 +418,7 @@ fun OnlineCopiesSheet(title: String, author: String, load: suspend () -> OnlineC
     val c = MaterialTheme.colorScheme
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = c.surfaceContainerLow) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp)) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 32.dp)) {
             Text("Get a copy", style = MaterialTheme.typography.headlineSmall)
             Text(
                 listOf(title, author).filter { it.isNotBlank() }.joinToString(" · "),
@@ -454,11 +457,13 @@ fun OnlineCopiesSheet(title: String, author: String, load: suspend () -> OnlineC
                             uri.openUri(links.googleBooksUrl)
                         }
                     }
+                    Spacer(Modifier.height(18.dp))
+                    BuySection(title, author)
                     Spacer(Modifier.height(14.dp))
                     HorizontalDivider()
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        "These are free, legal sources. Newer books are usually borrowed from a library or bought; free downloads are for books in the public domain.",
+                        "Free downloads are only for books in the public domain. Newer books can be borrowed from your library or bought from the stores above.",
                         style = MaterialTheme.typography.bodySmall,
                         color = c.onSurfaceVariant,
                     )

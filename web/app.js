@@ -1,5 +1,5 @@
 // Book Tracker for the web (iPhone via "Add to Home Screen"). Same features and data
-// model as the Android app: tabs for Books, Genres, Stats and Settings.
+// model as the Android app: tabs for Books, Genres, Library, Stats and Settings.
 import {
   addDays, clamp, closeOverlays, closeSheet, confirmDialog, download, esc, fromISO, icon, openSheet,
   prettyDate, relDate, store, toast, today, uuid,
@@ -14,18 +14,22 @@ import {
 } from './js/theme.js';
 import { mountColorWheel } from './js/colorwheel.js';
 import { GENRES, PROVIDERS, aiSettings, analyzeWithAi, getConfig, librarySignature, providerById } from './js/ai.js';
+import {
+  accountLink, buyLinks, catalogSearch as librarySearch, formatDistance, hasCatalog, librariesNear, mapLink, myLibrary,
+  PLACEHOLDER, roughLocation, saveLibrary, searchLibraries, unlinkLibrary, websiteLink, worldCat,
+} from './js/library.js';
 import { analyzeBasic, catalogDetails, catalogGenres, catalogSearch, copiesFrom, findCopies, searchBooks } from './js/lookup.js';
 
 const app = document.getElementById('app');
 const tabsBar = document.getElementById('tabs');
-const VERSION = '2.1';
+const VERSION = '2.2';
 const REPO = 'uzumakigojo78-prog/Book-Tracker-';
 
 // Ask the browser not to evict our data.
 navigator.storage?.persist?.().catch(() => {});
 
 /* ---------- navigation (hash routes) ---------- */
-// Tabs: #/  #/genres  #/stats  #/settings
+// Tabs: #/  #/genres  #/library  #/stats  #/settings
 // Pages: #/add[/<title>]  #/book/<id>[/log|/history]  #/book/<id>/edit  #/settings/<page>
 // Tabs in the reader's order: [route, label, icon]. The first one is home.
 const tabList = () => appearance.tabOrder.map((id) => TABS.find((t) => t[0] === id)).map(([, label, ic, route]) => [route, label, ic]);
@@ -77,6 +81,7 @@ function render() {
   }
   if (p[0] === 'settings' && p[1]) return renderSettingsPage(p[1], dir);
   if (p[0] === 'genres') return renderGenres(dir);
+  if (p[0] === 'library') return renderLibraryHub(dir);
   if (p[0] === 'stats') return renderStats(dir);
   if (p[0] === 'settings') return renderSettings(dir);
   if (p.length) { location.replace('#/'); return; }
@@ -297,7 +302,8 @@ function renderDetail(b, dir, tab) {
         <div class="headline-s">${pagesToday(b) > 0 ? `+${pagesToday(b)} pages` : 'Not logged yet'}</div></div>
       ${isFinished(b) ? '' : `<button class="btn filled k${idx} accent-btn" data-go-log>${icon('edit')}Log reading</button>`}
     </div>
-    <button class="btn outline big" data-copies>${icon('download')}Find online copies</button>`;
+    <button class="btn outline big" data-copies>${icon('download')}Find online copies</button>
+    <div class="panel">${buySection(b.title, b.author)}</div>`;
 
   const log = `
     <div class="panel">
@@ -883,6 +889,7 @@ function showBookInfo(initial) {
         ${b.googlePreviewUrl ? link('open_in_new', 'Preview on Google Books', b.googlePreviewUrl) : ''}
         ${link('link', 'Open Library page', b.workKey ? `https://openlibrary.org${b.workKey}` : `https://openlibrary.org/search?q=${encodeURIComponent(`${b.title} ${b.author}`)}`)}
       </div>
+      ${buySection(b.title, b.author)}
       ${b.description ? `<h3 class="title" style="margin:20px 0 6px">About this book</h3><p class="body-l description">${esc(b.description)}</p>`
         : b.workKey ? '<div class="center" style="padding:16px"><div class="loader"></div></div>' : ''}`;
     body.querySelector('[data-open-book]')?.addEventListener('click', () => { closeSheet(); go('/book/' + body.querySelector('[data-open-book]').dataset.openBook); });
@@ -916,7 +923,226 @@ async function showCopies(title, author) {
     ${link('download', 'Project Gutenberg', 'Free ebooks of classic, public-domain books', c.gutenbergUrl)}
     ${link('open_in_new', 'Google Books', 'Preview or buy the ebook', c.googleBooksUrl)}
   </div>
-  <p class="body-s muted sheet-note">These are free, legal sources. Newer books are usually borrowed from a library or bought; free downloads are for books in the public domain.</p>`;
+  ${buySection(title, author)}
+  <p class="body-s muted sheet-note">Free downloads are only for books in the public domain. Newer books can be borrowed from your library or bought from the stores above.</p>`;
+}
+
+/* ---------- buying & borrowing ---------- */
+function storeTile(ic, name, note, url, cls = '') {
+  return `<a class="store ${cls}" href="${esc(url)}" target="_blank" rel="noopener">${icon(ic)}
+    <span class="grow"><span class="store-name">${name}</span><span class="body-s">${note}</span></span></a>`;
+}
+
+/** "Get it from your library" plus stores to buy the book from; shown with every book description. */
+function buySection(title, author) {
+  const lib = myLibrary();
+  const q = [title, author].filter(Boolean).join(' ');
+  const libTile = lib
+    ? storeTile('local_library', `Check ${esc(lib.name)}`, hasCatalog(lib) ? "Search your library's catalog" : 'Find it in libraries near you', librarySearch(lib, q), 'lib-tile')
+    : storeTile('local_library', 'Find it at a library', 'Borrow it free · WorldCat', worldCat(title, author), 'lib-tile soft');
+  const stores = buyLinks(title, author).map((st) => {
+    const featured = st.id === 'amazon' || st.id === 'bn';
+    return storeTile(featured ? 'shopping_cart' : 'storefront', esc(st.name), esc(st.note), st.url, featured ? 'featured' : '');
+  }).join('');
+  return `<div class="buy"><h3 class="title">Get this book</h3>${libTile}<div class="store-grid">${stores}</div>
+    <p class="body-s muted">Store links open a search for this book. Prices and formats are on each store's site.</p></div>`;
+}
+
+/* ---------- Library tab ---------- */
+// The finder's state survives re-renders (e.g. switching tabs and back).
+const hub = { changing: false, results: null, loading: false, message: '', query: '', showCard: false, search: '' };
+
+function renderLibraryHub(dir) {
+  const lib = myLibrary();
+  if (!lib || hub.changing) return renderLibraryFinder(dir, lib);
+  const wanted = books.filter((b) => sectionOf(b) === 'want');
+  const bookQuery = (b) => [b.title, b.author].filter(Boolean).join(' ');
+  const card = lib.cardNumber || '';
+  const account = accountLink(lib);
+  const site = websiteLink(lib);
+  const chip = (ic, label, attrs) => `<a class="btn hub-chip" ${attrs}>${icon(ic)}${label}</a>`;
+  const digital = (name, sub, url, cls) => `<a class="link-row ${cls}" href="${url}" target="_blank" rel="noopener">${icon('auto_stories')}
+    <div class="grow"><div class="title-m">${name}</div><div class="body-s">${sub}</div></div>${icon('open_in_new')}</a>`;
+
+  app.innerHTML = `<section class="screen ${dir}">
+    ${pageHeader('Library', 'Your library hub')}
+    <div class="hero c0 lib-hero">
+      <div class="row" style="gap:12px">${icon('local_library', 'lib-icon')}<h2 class="headline-s grow">${esc(lib.name)}</h2></div>
+      <div style="margin-top:8px">
+        ${lib.address ? `<div class="info small">${icon('place')}${esc(lib.address)}</div>` : ''}
+        ${lib.hours ? `<div class="info small">${icon('schedule')}${esc(lib.hours)}</div>` : ''}
+        ${lib.phone ? `<div class="info small">${icon('call')}${esc(lib.phone)}</div>` : ''}
+      </div>
+      <div class="hub-chips">
+        ${site ? chip('language', 'Website', `href="${esc(site)}" target="_blank" rel="noopener"`) : ''}
+        ${chip('map', 'Directions', `href="${esc(mapLink(lib))}" target="_blank" rel="noopener"`)}
+        ${lib.phone ? chip('call', 'Call', `href="tel:${esc(lib.phone.replace(/[^\d+]/g, ''))}"`) : ''}
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 class="headline-s" style="margin:0 0 14px">Library card</h3>
+      ${card ? `<div class="lib-card">${icon('credit_card')}<span class="grow card-num ${hub.showCard ? 'shown' : ''}">${esc(hub.showCard ? card : '•••• ' + card.slice(-4))}</span>
+          <button class="icon-btn" data-toggle-card aria-label="${hub.showCard ? 'Hide' : 'Show'} card number">${icon(hub.showCard ? 'visibility_off' : 'visibility')}</button>
+          <button class="icon-btn" data-copy-card aria-label="Copy card number">${icon('content_copy')}</button></div>`
+        : '<p class="body-l muted" style="margin:0">Add your card number to keep it handy at the desk and when signing in.</p>'}
+      ${account ? `<a class="btn big filled" href="${esc(account)}" target="_blank" rel="noopener">${icon('person')}Sign in to my library account</a>` : ''}
+      <button class="btn big outline" data-edit-lib>${icon('edit')}${card ? 'Edit card & account links' : 'Add card & account links'}</button>
+    </div>
+
+    <div class="panel">
+      <h3 class="headline-s" style="margin:0 0 14px">Search the catalog</h3>
+      <form data-catalog>
+        <label class="field search-field" style="margin-bottom:0">
+          <input type="search" data-catalog-q value="${esc(hub.search)}" placeholder="Title, author or topic" enterkeyhint="search" autocomplete="off">${icon('search', 'lead')}
+        </label>
+        <button class="btn big filled" type="submit">${icon('search')}${hasCatalog(lib) ? `Search ${esc(lib.name)}` : 'Search libraries (WorldCat)'}</button>
+      </form>
+      ${hasCatalog(lib) ? '' : '<p class="body-s muted" style="margin:10px 4px 0">Tip: add your library\'s catalog in "Edit card & account links" to search it directly.</p>'}
+    </div>
+
+    <div class="panel">
+      <h3 class="headline-s" style="margin:0 0 14px">Want to read</h3>
+      ${wanted.length ? `<div class="stack">${wanted.map((b) => `<div class="row want-row">
+          ${badge(b, colorIndex(b), 'small')}
+          <a class="grow want-title" href="#/book/${esc(b.id)}"><span class="title-m block">${esc(b.title)}</span>${b.author ? `<span class="body-m muted block">${esc(b.author)}</span>` : ''}</a>
+          <a class="btn tonal" href="${esc(librarySearch(lib, bookQuery(b)))}" target="_blank" rel="noopener">Check</a></div>`).join('')}</div>`
+        : '<p class="body-l muted" style="margin:0">Books you add but haven\'t started show up here, so you can check if your library has them.</p>'}
+    </div>
+
+    <div class="panel">
+      <h3 class="headline-s" style="margin:0 0 14px">Borrow ebooks & audiobooks</h3>
+      <div class="links">
+        ${digital('Libby', 'Ebooks & audiobooks from your library', 'https://libbyapp.com', 'soft2')}
+        ${digital('Hoopla', 'Borrow instantly, no waitlists', 'https://www.hoopladigital.com', 'soft3')}
+        ${digital('Open Library', 'Free digital lending', 'https://openlibrary.org', '')}
+      </div>
+      <p class="body-s muted" style="margin:10px 4px 0">Sign in to these with your library card number.</p>
+    </div>
+
+    <div class="row" style="gap:10px">
+      <button class="btn outline grow" data-change-lib>${icon('swap_vert')}Change library</button>
+      <button class="btn text danger-text grow" data-unlink>${icon('link_off')}Unlink</button>
+    </div>
+    <p class="body-s muted" style="margin:14px 4px 0">Your library, card number and links are stored only on this device.</p>
+  </section>`;
+
+  app.querySelector('[data-toggle-card]')?.addEventListener('click', () => { hub.showCard = !hub.showCard; renderLibraryHub('none'); });
+  app.querySelector('[data-copy-card]')?.addEventListener('click', () => {
+    navigator.clipboard?.writeText(card).then(() => toast('Card number copied'), () => toast("Couldn't copy"));
+  });
+  app.querySelector('[data-edit-lib]').onclick = () => editLibrary(lib, () => renderLibraryHub('none'));
+  const qInput = app.querySelector('[data-catalog-q]');
+  qInput.oninput = () => { hub.search = qInput.value; };
+  app.querySelector('[data-catalog]').onsubmit = (e) => {
+    e.preventDefault();
+    const q = qInput.value.trim();
+    if (q) window.open(librarySearch(lib, q), '_blank', 'noopener');
+  };
+  app.querySelector('[data-change-lib]').onclick = () => { hub.changing = true; hub.results = null; hub.message = ''; renderLibraryHub('none'); };
+  app.querySelector('[data-unlink]').onclick = async () => {
+    const ok = await confirmDialog({ title: `Unlink ${lib.name}?`, text: 'Your saved card number and links for this library will be removed from this device.', confirm: 'Unlink', danger: true });
+    if (ok) { unlinkLibrary(); hub.changing = false; renderLibraryHub('none'); toast('Library unlinked'); }
+  };
+}
+
+function renderLibraryFinder(dir, current) {
+  const list = hub.results || [];
+  app.innerHTML = `<section class="screen ${dir}">
+    ${pageHeader('Library', 'Link your public library and keep everything in one place')}
+    <div class="hero k0">
+      ${icon('local_library', 'lib-icon')}
+      <h2 class="headline-s" style="margin:10px 0 4px">Find your library</h2>
+      <p class="body-l" style="margin:0">Your library becomes a hub: your card, your account, catalog search, your want-to-read list and free ebook apps.</p>
+      <button class="btn big filled" data-near style="margin-top:16px" ${hub.loading ? 'disabled' : ''}>${icon('my_location')}Find libraries near me</button>
+      <div class="privacy">${icon('lock')}<span>Location is only used to look up libraries near you, once. It's rounded to about 1 km, sent only to OpenStreetMap's library search and never saved or used for anything else.</span></div>
+    </div>
+    <form data-lib-search>
+      <label class="field search-field">
+        <input type="search" data-lib-q value="${esc(hub.query)}" placeholder="Or: library name, city or ZIP" enterkeyhint="search" autocomplete="off">${icon('search', 'lead')}
+      </label>
+    </form>
+    ${hub.loading ? '<div class="center" style="padding:24px"><div class="loader big"></div></div>' : ''}
+    ${hub.message ? `<p class="body-l muted" style="margin:0 4px 14px">${esc(hub.message)}</p>` : ''}
+    ${!hub.loading && list.length ? `<h3 class="title" style="margin:4px 4px 10px">${list.length} ${list.length === 1 ? 'library' : 'libraries'}</h3>
+      <div class="stack">${list.map((l, i) => `<div class="panel lib-result" style="margin:0">
+        <div class="row" style="align-items:flex-start;gap:12px">${icon('local_library', 'lib-result-icon')}
+          <div class="grow"><div class="title">${esc(l.name)}</div>
+            ${l.address ? `<div class="info small">${icon('place')}${esc(l.address)}</div>` : ''}
+            ${l.distanceKm != null ? `<div class="info small">${icon('my_location')}${formatDistance(l.distanceKm)}</div>` : ''}
+            ${l.hours ? `<div class="info small">${icon('schedule')}${esc(l.hours)}</div>` : ''}
+          </div></div>
+        <button class="btn big tonal" data-pick="${i}">${icon('check_circle')}This is my library</button></div>`).join('')}</div>` : ''}
+    <button class="btn text big" data-manual style="margin-top:10px">${icon('edit')}Not listed? Add your library yourself</button>
+    ${current ? `<button class="btn outline big" data-keep style="margin-top:8px">Keep my current library</button>` : ''}
+  </section>`;
+
+  const pick = (l) => {
+    // Keep the reader's card and links when they switch branches.
+    saveLibrary({ ...l, cardNumber: current?.cardNumber || '', accountUrl: current?.accountUrl || '', catalogUrl: current?.catalogUrl || '' });
+    Object.assign(hub, { changing: false, results: null, message: '' });
+    renderLibraryHub('none');
+    toast(`Linked ${l.name}`);
+  };
+  const run = async (task, empty) => {
+    Object.assign(hub, { loading: true, message: '' });
+    renderLibraryFinder('none', current);
+    try {
+      hub.results = await task();
+      if (!hub.results.length) hub.message = empty;
+    } catch (e) {
+      hub.results = null;
+      hub.message = e?.code === 1 ? 'No problem. Search by library name, city or ZIP code instead.'
+        : e?.code ? "Couldn't get your location. Check that location is on, or search by name, city or ZIP instead."
+          : 'Library search failed. Check your connection and try again.';
+    }
+    hub.loading = false;
+    if (location.hash.startsWith('#/library')) renderLibraryFinder('none', current);
+  };
+  app.querySelector('[data-near]').onclick = () => run(async () => {
+    const [lat, lon] = await roughLocation();
+    return librariesNear(lat, lon);
+  }, 'No libraries found nearby. Try searching by city or ZIP.');
+  const q = app.querySelector('[data-lib-q]');
+  q.oninput = () => { hub.query = q.value; };
+  app.querySelector('[data-lib-search]').onsubmit = (e) => {
+    e.preventDefault();
+    const text = q.value.trim();
+    if (text) run(() => searchLibraries(text), `No libraries found for "${text}". Try a city, ZIP code or the library's name.`);
+  };
+  app.querySelectorAll('[data-pick]').forEach((el) => { el.onclick = () => pick(list[Number(el.dataset.pick)]); });
+  app.querySelector('[data-manual]').onclick = () => editLibrary({ name: hub.query.trim() }, () => {
+    Object.assign(hub, { changing: false, results: null, message: '' });
+    renderLibraryHub('none');
+  });
+  app.querySelector('[data-keep]')?.addEventListener('click', () => { hub.changing = false; renderLibraryHub('none'); });
+}
+
+/** Sheet to add or edit the library's name, card number and links. */
+function editLibrary(lib, onSaved) {
+  const field = (key, label, ic, value, type = 'text', extra = '') => `<label class="field">
+      <input data-f="${key}" type="${type}" value="${esc(value || '')}" autocomplete="off" spellcheck="false" ${extra}>
+      <span class="lbl">${label}</span>${icon(ic, 'lead')}</label>`;
+  const body = openSheet(`<h2 class="headline-s">${lib.name ? 'Card & account' : 'Add your library'}</h2>
+    <form class="stack" data-lib-form style="margin-top:14px">
+      ${field('name', 'Library name', 'local_library', lib.name, 'text', 'required autocapitalize="words"')}
+      ${field('cardNumber', 'Library card number', 'credit_card', lib.cardNumber, 'text', 'inputmode="text"')}
+      ${field('website', 'Library website', 'language', lib.website, 'text', 'inputmode="url" autocapitalize="off"')}
+      ${field('accountUrl', 'Account sign-in page', 'person', lib.accountUrl, 'text', 'inputmode="url" autocapitalize="off"')}
+      ${field('catalogUrl', 'Catalog search link', 'search', lib.catalogUrl, 'text', 'inputmode="url" autocapitalize="off"')}
+      <p class="body-s muted" style="margin:0 4px">To link the catalog: on your library's website, search for the word "${PLACEHOLDER}", then copy that page's address here. Book Tracker swaps in whatever you search for.</p>
+      <button class="btn big filled" type="submit">${icon('save')}Save</button>
+    </form>`);
+  body.querySelector('[data-lib-form]').onsubmit = (e) => {
+    e.preventDefault();
+    const v = (k) => body.querySelector(`[data-f="${k}"]`).value.trim();
+    const name = v('name');
+    if (!name) return;
+    saveLibrary({ ...lib, name, cardNumber: v('cardNumber'), website: v('website') || null, accountUrl: v('accountUrl'), catalogUrl: v('catalogUrl') });
+    closeSheet();
+    toast('Library saved');
+    onSaved();
+  };
 }
 
 /* ---------- Settings tab ---------- */

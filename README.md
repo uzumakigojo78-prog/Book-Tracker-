@@ -33,6 +33,17 @@ indicators and springy motion.
 - **Get a copy**: links for any book or recommendation to free, legal sources:
   public-domain downloads and free borrowing via Open Library / the Internet Archive,
   Project Gutenberg, and Google Books.
+- **Buy links on every book**: book pages, search results and recommendations link to Amazon,
+  Barnes & Noble, Bookshop.org, Books-A-Million, Google Play Books, Kobo, ThriftBooks and
+  AbeBooks, plus "Check your library" (or WorldCat if you haven't linked one).
+- **Library tab, your library hub**: find your public library near you or by name, city or
+  ZIP, then keep it all in one place: address, hours, website, directions and phone; your
+  library card number (hidden until you tap, with copy); a sign-in link to your library
+  account; catalog search; your want-to-read list with one-tap "Check" at the library; and
+  Libby, Hoopla and Open Library for free ebooks and audiobooks. **Location is used only to
+  look up libraries**: only when you tap "Find libraries near me", rounded to about 1 km,
+  sent only to OpenStreetMap's library search, and never saved. Your library and card stay on
+  your device.
 - **Books tab sections**: Currently reading, Want to read and Read, collapsible and in any
   order (the reorder button next to "My Books").
 - **Make it yours**: any Google Font as the main font (search 1,500+ fonts in Settings → Text),
@@ -58,7 +69,7 @@ indicators and springy motion.
    keeps your books on your phone.
 
 The web app has the same tabs and features as the Android app (Books, Genres with
-AI, Stats, Settings with themes, text and icon styles). Use **Settings → Backups** now
+AI, Library, Stats, Settings with themes, text and icon styles). Use **Settings → Backups** now
 and then to save a CSV or JSON copy of your data; it can also restore CSV backups made
 by the Android app. Browsers can't run scheduled backups in the background, so
 automatic backups are Android-only.

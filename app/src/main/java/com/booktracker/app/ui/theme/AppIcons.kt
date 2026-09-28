@@ -4,6 +4,54 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.rounded.ShoppingCart
+import androidx.compose.material.icons.sharp.ShoppingCart
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.outlined.LocalLibrary
+import androidx.compose.material.icons.rounded.LocalLibrary
+import androidx.compose.material.icons.sharp.LocalLibrary
+import androidx.compose.material.icons.filled.LocalLibrary
+import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material.icons.rounded.MyLocation
+import androidx.compose.material.icons.sharp.MyLocation
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.rounded.Place
+import androidx.compose.material.icons.sharp.Place
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.outlined.Phone
+import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material.icons.sharp.Phone
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.sharp.Schedule
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material.icons.sharp.Map
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.rounded.CreditCard
+import androidx.compose.material.icons.sharp.CreditCard
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.outlined.LinkOff
+import androidx.compose.material.icons.rounded.LinkOff
+import androidx.compose.material.icons.sharp.LinkOff
+import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.rounded.Storefront
+import androidx.compose.material.icons.sharp.Storefront
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.sharp.ContentCopy
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.sharp.Language
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.sharp.KeyboardArrowUp
@@ -812,5 +860,101 @@ object AppIcons {
             IconStyle.ROUNDED -> Icons.Rounded.AutoStories
             IconStyle.SHARP -> Icons.Sharp.AutoStories
             IconStyle.FILLED -> Icons.Filled.AutoStories
+        }
+
+    val ShoppingCart: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.ShoppingCart
+            IconStyle.ROUNDED -> Icons.Rounded.ShoppingCart
+            IconStyle.SHARP -> Icons.Sharp.ShoppingCart
+            IconStyle.FILLED -> Icons.Filled.ShoppingCart
+        }
+
+    val LocalLibrary: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.LocalLibrary
+            IconStyle.ROUNDED -> Icons.Rounded.LocalLibrary
+            IconStyle.SHARP -> Icons.Sharp.LocalLibrary
+            IconStyle.FILLED -> Icons.Filled.LocalLibrary
+        }
+
+    val MyLocation: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.MyLocation
+            IconStyle.ROUNDED -> Icons.Rounded.MyLocation
+            IconStyle.SHARP -> Icons.Sharp.MyLocation
+            IconStyle.FILLED -> Icons.Filled.MyLocation
+        }
+
+    val Place: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.Place
+            IconStyle.ROUNDED -> Icons.Rounded.Place
+            IconStyle.SHARP -> Icons.Sharp.Place
+            IconStyle.FILLED -> Icons.Filled.Place
+        }
+
+    val Phone: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.Phone
+            IconStyle.ROUNDED -> Icons.Rounded.Phone
+            IconStyle.SHARP -> Icons.Sharp.Phone
+            IconStyle.FILLED -> Icons.Filled.Phone
+        }
+
+    val Schedule: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.Schedule
+            IconStyle.ROUNDED -> Icons.Rounded.Schedule
+            IconStyle.SHARP -> Icons.Sharp.Schedule
+            IconStyle.FILLED -> Icons.Filled.Schedule
+        }
+
+    val Map: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.Map
+            IconStyle.ROUNDED -> Icons.Rounded.Map
+            IconStyle.SHARP -> Icons.Sharp.Map
+            IconStyle.FILLED -> Icons.Filled.Map
+        }
+
+    val CreditCard: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.CreditCard
+            IconStyle.ROUNDED -> Icons.Rounded.CreditCard
+            IconStyle.SHARP -> Icons.Sharp.CreditCard
+            IconStyle.FILLED -> Icons.Filled.CreditCard
+        }
+
+    val LinkOff: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.LinkOff
+            IconStyle.ROUNDED -> Icons.Rounded.LinkOff
+            IconStyle.SHARP -> Icons.Sharp.LinkOff
+            IconStyle.FILLED -> Icons.Filled.LinkOff
+        }
+
+    val Storefront: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.Storefront
+            IconStyle.ROUNDED -> Icons.Rounded.Storefront
+            IconStyle.SHARP -> Icons.Sharp.Storefront
+            IconStyle.FILLED -> Icons.Filled.Storefront
+        }
+
+    val ContentCopy: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.ContentCopy
+            IconStyle.ROUNDED -> Icons.Rounded.ContentCopy
+            IconStyle.SHARP -> Icons.Sharp.ContentCopy
+            IconStyle.FILLED -> Icons.Filled.ContentCopy
+        }
+
+    val Language: ImageVector
+        @Composable @ReadOnlyComposable get() = when (LocalAppearance.current.iconStyle) {
+            IconStyle.OUTLINED -> Icons.Outlined.Language
+            IconStyle.ROUNDED -> Icons.Rounded.Language
+            IconStyle.SHARP -> Icons.Sharp.Language
+            IconStyle.FILLED -> Icons.Filled.Language
         }
 }
