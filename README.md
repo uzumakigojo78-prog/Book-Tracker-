@@ -25,6 +25,11 @@ indicators and springy motion.
   its own key and model, and you can change the model name. Without a key it still works in
   basic mode using Open Library's subject tags. Usage is billed by the service you choose and
   only runs when you tap Analyze.
+- **Search any book** (Genres tab): search by title, author or topic and open a full book page
+  with cover, release date, pages, publisher, rating, genres and description. Add it to your
+  books in one tap, and download a **free PDF** when the book is in the public domain (via
+  Google Books or the Internet Archive). Copyrighted books get borrow, preview and buy links
+  instead.
 - **Get a copy**: links for any book or recommendation to free, legal sources:
   public-domain downloads and free borrowing via Open Library / the Internet Archive,
   Project Gutenberg, and Google Books.

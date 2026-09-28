@@ -182,3 +182,83 @@ export async function findCopies(title, author) {
   if (doc) copiesCache.set(query, copies);
   return copies;
 }
+
+/* ---------- book search for the Genres tab (all details + legal free PDFs) ---------- */
+
+const stripHtml = (s) => String(s).replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim();
+
+function catalogFromOpenLibrary(data) {
+  return (data.docs || []).filter((d) => d.title).map((d) => {
+    const year = d.first_publish_year || null;
+    const ia = d.ia?.[0] || null;
+    const access = d.ebook_access || null;
+    const exact = (d.publish_date || []).map(parseLooseDate).filter((x) => x && Number(x.slice(0, 4)) === year).sort()[0];
+    return {
+      title: d.title, author: (d.author_name || []).join(', '), year,
+      releaseDate: exact || (year ? `${year}-01-01` : null),
+      pages: d.number_of_pages_median || null,
+      coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg?default=false` : null,
+      publisher: d.publisher?.[0] || null, rating: d.ratings_average || null,
+      subjects: (d.subject || []).slice(0, 40), description: null,
+      workKey: d.key?.startsWith('/works/') ? d.key : null, ebookAccess: access, iaId: ia,
+      // Public-domain scans on the Internet Archive can be downloaded as PDF.
+      freePdfUrl: access === 'public' && ia ? `https://archive.org/download/${ia}/${ia}.pdf` : null,
+      googlePreviewUrl: null,
+    };
+  });
+}
+
+function catalogFromGoogle(data) {
+  return (data.items || []).filter((it) => it.volumeInfo?.title).map((it) => {
+    const v = it.volumeInfo, a = it.accessInfo || {};
+    const date = v.publishedDate ? (/^\d{4}$/.test(v.publishedDate) ? `${v.publishedDate}-01-01` : /^\d{4}-\d{2}$/.test(v.publishedDate) ? `${v.publishedDate}-01` : v.publishedDate.slice(0, 10)) : null;
+    return {
+      title: v.title, author: (v.authors || []).join(', '), year: date ? Number(date.slice(0, 4)) : null, releaseDate: date,
+      pages: v.pageCount || null,
+      coverUrl: v.imageLinks?.thumbnail ? v.imageLinks.thumbnail.replace('http://', 'https://').replace('&edge=curl', '') : null,
+      publisher: v.publisher || null, rating: v.averageRating || null, subjects: v.categories || [],
+      description: v.description ? stripHtml(v.description) : null,
+      workKey: null, ebookAccess: null, iaId: null,
+      // Google only offers a PDF download link for free, public-domain books.
+      freePdfUrl: a.publicDomain && a.pdf?.isAvailable && /^https?:/.test(a.pdf.downloadLink || '') ? a.pdf.downloadLink.replace('http://', 'https://') : null,
+      googlePreviewUrl: v.previewLink ? v.previewLink.replace('http://', 'https://') : null,
+    };
+  });
+}
+
+export function mergeCatalog(primary, secondary) {
+  const out = new Map();
+  for (const b of [...primary, ...secondary]) {
+    const key = norm(b.title) + '|' + norm(b.author.split(',')[0]);
+    const e = out.get(key);
+    if (!e) { out.set(key, { ...b }); continue; }
+    const yearOnly = e.releaseDate?.endsWith('-01-01');
+    if (!e.releaseDate || (yearOnly && b.releaseDate && b.releaseDate.slice(0, 4) === e.releaseDate.slice(0, 4) && !b.releaseDate.endsWith('-01-01'))) e.releaseDate = b.releaseDate;
+    for (const f of ['pages', 'coverUrl', 'publisher', 'rating', 'description', 'freePdfUrl', 'googlePreviewUrl']) e[f] ??= b[f];
+    e.subjects = [...new Set([...e.subjects, ...b.subjects])];
+  }
+  return [...out.values()];
+}
+
+export async function catalogSearch(query, signal) {
+  const q = encodeURIComponent(query.trim());
+  const [ol, g] = await Promise.allSettled([
+    getJSON(`https://openlibrary.org/search.json?limit=15&fields=key,title,author_name,first_publish_year,number_of_pages_median,cover_i,publisher,ratings_average,subject,ebook_access,ia,publish_date&q=${q}`, signal),
+    getJSON(`https://www.googleapis.com/books/v1/volumes?maxResults=15&printType=books&fields=items(id,volumeInfo(title,authors,publishedDate,pageCount,publisher,averageRating,categories,description,imageLinks/thumbnail,previewLink),accessInfo(publicDomain,pdf(isAvailable,downloadLink)))&q=${q}`, signal),
+  ]);
+  if (ol.status === 'rejected' && g.status === 'rejected' && signal?.aborted) throw new DOMException('aborted', 'AbortError');
+  return mergeCatalog(ol.status === 'fulfilled' ? catalogFromOpenLibrary(ol.value) : [], g.status === 'fulfilled' ? catalogFromGoogle(g.value) : []).slice(0, 20);
+}
+
+/** Fills in the description from Open Library when the search didn't include one. */
+export async function catalogDetails(book) {
+  if (book.description || !book.workKey) return book;
+  try {
+    const d = (await getJSON(`https://openlibrary.org${book.workKey}.json`)).description;
+    const text = typeof d === 'string' ? d : d?.value;
+    if (text) return { ...book, description: text.split('\n----------')[0].replace(/\[([^\]]+)]\([^)]*\)/g, '$1').trim() };
+  } catch { /* keep what we have */ }
+  return book;
+}
+
+export const catalogGenres = (book) => genresFromSubjects(book.subjects).filter((g) => g !== 'Other');

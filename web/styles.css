@@ -403,3 +403,26 @@ a.btn { text-decoration: none; }
 #toast.show { opacity: 1; }
 body.has-tabs #toast { bottom: calc(var(--safe-bottom) + 96px); }
 .btn { white-space: nowrap; }
+
+/* Book search (Genres tab) */
+.search-field { margin-bottom: 16px; }
+.search-field input { height: 56px; padding: 0 52px; border-radius: calc(28px * var(--rs)); font-size: calc(18px * var(--ts)); font-weight: var(--w700); }
+.search-field input::-webkit-search-cancel-button { display: none; }
+.search-field .lead { top: 16px; }
+.search-field .trail { top: 4px; }
+.result-row { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 14px; border-radius: var(--r-lg); background: var(--surface-container-high); animation: pop .4s var(--spring) both; transition: border-radius .35s var(--spring), transform .35s var(--spring); }
+.result-row:active { border-radius: calc(14px * var(--rs)); transform: scale(.98); }
+.result-row .meta { font-size: calc(13px * var(--ts)); font-weight: var(--w800); color: var(--primary); }
+.badge.result-badge { width: 56px; border-radius: calc(12px * var(--rs)); font-size: calc(26px * var(--ts)); }
+.badge.info-badge { width: 104px; border-radius: calc(18px * var(--rs)); font-size: calc(48px * var(--ts)); }
+.facts { display: grid; gap: 3px; margin-top: 8px; font-size: calc(14px * var(--ts)); }
+.facts div { display: flex; align-items: center; gap: 6px; }
+.facts .ms { font-size: calc(18px * var(--ts)); color: var(--on-surface-variant); }
+.btn.added { background: var(--secondary); color: var(--on-secondary); }
+.btn.pdf-btn { width: 100%; height: 56px; background: var(--tertiary-container); color: var(--on-tertiary-container); }
+.link-btn { justify-content: flex-start; text-align: left; height: 50px !important; font-size: calc(15px * var(--ts)); }
+.link-btn .ms:last-child { font-size: calc(16px * var(--ts)); }
+.note-box { display: flex; gap: 10px; align-items: center; padding: 14px; border-radius: var(--r-lg); background: var(--surface-container-highest); font-size: calc(15px * var(--ts)); }
+.note-box .ms { color: var(--on-surface-variant); }
+.description { white-space: pre-line; margin: 0; }
+.sheet .stack .btn.big { margin-top: 0; }
