@@ -1,8 +1,21 @@
 package com.booktracker.app.ui.screens
 
+import com.booktracker.app.ui.components.ButtonText
 import com.booktracker.app.ui.theme.AppIcons
 import com.booktracker.app.ui.theme.LocalAppearance
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import com.booktracker.app.ui.theme.BookSection
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -50,8 +63,12 @@ fun LibraryScreen(
     books: List<Book>,
     onAddBook: () -> Unit,
     onOpenBook: (String) -> Unit,
+    sectionOrder: List<BookSection>,
+    onReorderSections: (List<BookSection>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var collapsed by rememberSaveable { mutableStateOf(setOf<String>()) }
+    var reordering by remember { mutableStateOf(false) }
     // No top app bar: the heading scrolls with the list so the whole screen is content.
     Scaffold(
         modifier = modifier,
@@ -59,7 +76,7 @@ fun LibraryScreen(
             ExtendedFloatingActionButton(
                 onClick = onAddBook,
                 icon = { Icon(AppIcons.Add, contentDescription = null, modifier = Modifier.size(28.dp)) },
-                text = { Text("Add book", style = MaterialTheme.typography.titleMedium) },
+                text = { ButtonText("Add book", MaterialTheme.typography.titleMedium) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = MaterialTheme.shapes.large,
@@ -68,14 +85,12 @@ fun LibraryScreen(
     ) { padding ->
         if (books.isEmpty()) {
             Column(Modifier.padding(padding)) {
-                Header(books, Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp))
+                Header(books, onReorder = null, Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp))
                 EmptyLibrary()
             }
         } else {
-            // Unfinished books first, most recently added at the top.
-            val ordered = books.withIndex().sortedWith(
-                compareBy<IndexedValue<Book>> { it.value.isFinished }.thenByDescending { it.value.createdAt }
-            )
+            // Books grouped into the reader's sections, in the order they chose.
+            val bySection = books.withIndex().groupBy { it.value.section() }
             LazyColumn(
                 contentPadding = PaddingValues(
                     start = 16.dp,
@@ -85,19 +100,116 @@ fun LibraryScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                item { Header(books, Modifier.padding(start = 4.dp, bottom = 4.dp)) }
-                itemsIndexed(ordered, key = { _, it -> it.value.id }) { _, (colorIndex, book) ->
-                    BookCard(book, colorIndex, onClick = { onOpenBook(book.id) }, modifier = Modifier.animateItem())
+                item { Header(books, onReorder = { reordering = true }, Modifier.padding(start = 4.dp, bottom = 4.dp)) }
+                sectionOrder.forEach { section ->
+                    val list = bySection[section].orEmpty().sortedWith(section.comparator())
+                    val open = section.name !in collapsed
+                    item(key = "section-${section.name}") {
+                        SectionHeader(section, list.size, open, Modifier.animateItem()) {
+                            collapsed = if (open) collapsed + section.name else collapsed - section.name
+                        }
+                    }
+                    if (open) {
+                        if (list.isEmpty()) {
+                            item(key = "empty-${section.name}") {
+                                Text(
+                                    section.emptyHint,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp).animateItem(),
+                                )
+                            }
+                        }
+                        items(list, key = { it.value.id }) { (colorIndex, book) ->
+                            BookCard(book, colorIndex, onClick = { onOpenBook(book.id) }, modifier = Modifier.animateItem())
+                        }
+                    }
                 }
             }
         }
     }
+
+    if (reordering) {
+        AlertDialog(
+            onDismissRequest = { reordering = false },
+            icon = { Icon(AppIcons.SwapVert, null) },
+            title = { Text("Reorder sections") },
+            text = { ReorderList(items = sectionOrder, label = { it.label }, onMove = onReorderSections) },
+            confirmButton = { TextButton(onClick = { reordering = false }) { Text("Done") } },
+        )
+    }
+}
+
+/** Which section of the Books tab a book belongs in. */
+fun Book.section(): BookSection = when {
+    isFinished -> BookSection.READ
+    currentPage > 0 -> BookSection.READING
+    else -> BookSection.WANT
+}
+
+private val Book.lastRead get() = sortedEntries.lastOrNull()?.date
+
+private fun BookSection.comparator(): Comparator<IndexedValue<Book>> = when (this) {
+    // Most recently read first.
+    BookSection.READING, BookSection.READ -> compareByDescending<IndexedValue<Book>> { it.value.lastRead }.thenByDescending { it.value.createdAt }
+    BookSection.WANT -> compareByDescending { it.value.createdAt }
+}
+
+private val BookSection.emptyHint: String get() = when (this) {
+    BookSection.READING -> "Log a page on a book to start reading it."
+    BookSection.WANT -> "Books you add but haven't started go here."
+    BookSection.READ -> "Finished books land here."
 }
 
 @Composable
-private fun Header(books: List<Book>, modifier: Modifier = Modifier) {
+private fun SectionHeader(section: BookSection, count: Int, open: Boolean, modifier: Modifier = Modifier, onToggle: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    val (bg, fg) = when (section) {
+        BookSection.READING -> c.primary to c.onPrimary
+        BookSection.WANT -> c.secondary to c.onSecondary
+        BookSection.READ -> c.tertiary to c.onTertiary
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.large)
+            .clickable(onClick = onToggle)
+            .padding(start = 4.dp, top = 6.dp, bottom = 2.dp),
+    ) {
+        Icon(
+            when (section) {
+                BookSection.READING -> AppIcons.AutoStories
+                BookSection.WANT -> AppIcons.Bookmark
+                BookSection.READ -> AppIcons.TaskAlt
+            },
+            null,
+            tint = bg,
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(section.label, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.background(bg, MaterialTheme.shapes.small).padding(horizontal = 10.dp, vertical = 2.dp),
+        ) { Text("$count", style = MaterialTheme.typography.labelLarge, color = fg) }
+        Icon(if (open) AppIcons.ExpandLess else AppIcons.ExpandMore, if (open) "Collapse" else "Expand", modifier = Modifier.padding(horizontal = 8.dp))
+    }
+}
+
+@Composable
+private fun Header(books: List<Book>, onReorder: (() -> Unit)?, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth()) {
-        Text("My Books", style = MaterialTheme.typography.displaySmall, fontWeight = LocalAppearance.current.heavyWeight)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "My Books",
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = LocalAppearance.current.heavyWeight,
+                modifier = Modifier.weight(1f),
+            )
+            if (onReorder != null) {
+                FilledTonalIconButton(onClick = onReorder) { Icon(AppIcons.SwapVert, "Reorder sections") }
+            }
+        }
         if (books.isNotEmpty()) {
             val reading = books.count { !it.isFinished }
             Text(

@@ -58,6 +58,7 @@ import com.booktracker.app.ai.Recommendation
 import com.booktracker.app.ai.librarySignature
 import com.booktracker.app.data.Book
 import com.booktracker.app.data.BookDetails
+import com.booktracker.app.ui.components.ButtonText
 import com.booktracker.app.ui.components.BookBadge
 import com.booktracker.app.ui.components.SectionCard
 import com.booktracker.app.ui.components.bookAccent
@@ -298,13 +299,13 @@ private fun ModeCard(
                 ) {
                     Icon(if (hasResult) AppIcons.Refresh else AppIcons.AutoAwesome, null)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (!hasResult) "Analyze" else if (outdated) "Update" else "Re-analyze", style = MaterialTheme.typography.titleSmall)
+                    ButtonText(if (!hasResult) "Analyze" else if (outdated) "Update" else "Re-analyze", MaterialTheme.typography.titleSmall)
                 }
                 if (!hasAi) {
-                    FilledTonalButton(onClick = onSetUpAi, modifier = Modifier.height(52.dp)) {
+                    FilledTonalButton(onClick = onSetUpAi, modifier = Modifier.weight(1f).height(52.dp)) {
                         Icon(AppIcons.Key, null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Set up AI", style = MaterialTheme.typography.titleSmall)
+                        ButtonText("Set up AI", MaterialTheme.typography.titleSmall)
                     }
                 }
             }
@@ -383,12 +384,12 @@ private fun RecommendationCard(rec: Recommendation, vm: GenreViewModel, onGetCop
             FilledTonalButton(onClick = onGetCopy, modifier = Modifier.weight(1f).height(48.dp)) {
                 Icon(AppIcons.Download, null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Get a copy", style = MaterialTheme.typography.titleSmall)
+                ButtonText("Get a copy", MaterialTheme.typography.titleSmall)
             }
             OutlinedButton(onClick = onAdd, modifier = Modifier.weight(1f).height(48.dp)) {
                 Icon(AppIcons.LibraryAdd, null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Add to books", style = MaterialTheme.typography.titleSmall)
+                ButtonText("Add to books", MaterialTheme.typography.titleSmall)
             }
         }
     }

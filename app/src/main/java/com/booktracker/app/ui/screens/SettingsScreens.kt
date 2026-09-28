@@ -1,6 +1,23 @@
 package com.booktracker.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextOverflow
+import com.booktracker.app.settings.CustomFonts
+import com.booktracker.app.ui.components.ButtonText
+import com.booktracker.app.ui.components.ColorWheelPicker
+import com.booktracker.app.ui.theme.seedSwatch
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +60,7 @@ import com.booktracker.app.backup.BackupSettings
 import com.booktracker.app.data.Book
 import com.booktracker.app.data.ReadingEntry
 import com.booktracker.app.settings.AppearanceSettings
+import com.booktracker.app.ui.components.ButtonText
 import com.booktracker.app.ui.components.ChoiceButton
 import com.booktracker.app.ui.components.NavRow
 import com.booktracker.app.ui.components.SectionCard
@@ -60,7 +78,7 @@ import com.booktracker.app.ui.theme.isDark
 import com.booktracker.app.ui.theme.paletteSwatch
 import java.time.LocalDate
 
-enum class SettingsPage { APPEARANCE, TEXT, STYLE, AI, BACKUPS }
+enum class SettingsPage { APPEARANCE, TEXT, STYLE, AI, BACKUPS, DEVELOPER }
 
 /** The Settings tab: one row per settings page. */
 @Composable
@@ -97,12 +115,12 @@ fun SettingsScreen(
         item {
             NavRow(
                 AppIcons.TextFields, "Text",
-                "${a.textSize.label} · ${a.font.label}${if (a.boldText) " · Bold" else ""}",
+                "${a.textSize.label} · ${a.fontLabel}${if (a.boldText) " · Bold" else ""}",
                 c.secondary, c.onSecondary,
             ) { onOpen(SettingsPage.TEXT) }
         }
         item {
-            NavRow(AppIcons.Style, "Style", "${a.corners.label} corners · ${a.iconStyle.label} icons", c.tertiary, c.onTertiary) {
+            NavRow(AppIcons.Style, "Style & layout", "${a.corners.label} corners · ${a.iconStyle.label} icons · tab order", c.tertiary, c.onTertiary) {
                 onOpen(SettingsPage.STYLE)
             }
         }
@@ -121,13 +139,18 @@ fun SettingsScreen(
             ) { onOpen(SettingsPage.BACKUPS) }
         }
         item {
+            NavRow(AppIcons.Code, "Developer", "App info, GitHub, updates and what's new", c.surfaceContainerHighest, c.onSurface) {
+                onOpen(SettingsPage.DEVELOPER)
+            }
+        }
+        item {
             OutlinedButton(
                 onClick = { appearanceSettings.reset() },
                 modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 4.dp),
             ) {
                 Icon(AppIcons.RestartAlt, null)
                 Spacer(Modifier.width(8.dp))
-                Text("Reset look to defaults", style = MaterialTheme.typography.titleSmall)
+                ButtonText("Reset look to defaults", MaterialTheme.typography.titleSmall)
             }
         }
         item {
@@ -197,7 +220,7 @@ fun AppearancePage(settings: AppearanceSettings, onBack: () -> Unit) {
                     .forEach { palette ->
                         Swatch(
                             label = palette.label,
-                            colors = if (palette == ColorPalette.DYNAMIC) {
+                            colors = if (palette == ColorPalette.CUSTOM) seedSwatch(a.customColor, dark) else if (palette == ColorPalette.DYNAMIC) {
                                 // Shows the current wallpaper colours only when selected; otherwise a hint.
                                 if (a.palette == palette) listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.tertiary)
                                 else listOf(Color(0xFF7D8B99), Color(0xFFB39DDB), Color(0xFF80CBC4))
@@ -213,6 +236,30 @@ fun AppearancePage(settings: AppearanceSettings, onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+        SectionCard(title = "Pick your own color") {
+            var pick by remember { mutableIntStateOf(a.customColor) }
+            ColorWheelPicker(pick, onChange = { pick = it })
+            Spacer(Modifier.height(16.dp))
+            Text("Your palette", style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                seedSwatch(pick, a.isDark()).forEachIndexed { i, color ->
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.fillMaxWidth().height(44.dp).background(color, MaterialTheme.shapes.medium))
+                        Text(listOf("Main", "Second", "Accent")[i], style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            Button(
+                onClick = { settings.setCustomColor(pick) },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+            ) {
+                Icon(AppIcons.Colorize, null)
+                Spacer(Modifier.width(8.dp))
+                ButtonText(if (a.palette == ColorPalette.CUSTOM && a.customColor == pick) "Using this color" else "Use this color")
             }
         }
     }
@@ -271,10 +318,17 @@ private fun Swatch(label: String, colors: List<Color>, selected: Boolean, onClic
 
 /* ---------- Text ---------- */
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TextPage(settings: AppearanceSettings, onBack: () -> Unit) {
     val a = LocalAppearance.current
+    val context = LocalContext.current.applicationContext
+    val scope = rememberCoroutineScope()
+    var fontQuery by rememberSaveable { mutableStateOf("") }
+    var fontError by remember { mutableStateOf<String?>(null) }
+    var downloading by remember { mutableStateOf<String?>(null) }
+    var fontsVersion by remember { mutableIntStateOf(0) }
+    val myFonts = remember(fontsVersion, a.font) { CustomFonts.downloaded(context) }
     SubPage("Text", onBack) {
         SectionCard(color = MaterialTheme.colorScheme.primaryContainer) {
             Text("The Hobbit", style = MaterialTheme.typography.headlineLarge)
@@ -295,7 +349,7 @@ fun TextPage(settings: AppearanceSettings, onBack: () -> Unit) {
         SectionCard(title = "Font") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 FontChoice.entries.forEach { font ->
-                    val selected = a.font == font
+                    val selected = a.font == font.name
                     ChoiceButton(
                         font.label,
                         selected = selected,
@@ -307,10 +361,110 @@ fun TextPage(settings: AppearanceSettings, onBack: () -> Unit) {
                                 fontFamily = font.family,
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
                                 color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                             )
                         },
                     )
+                }
+            }
+            if (myFonts.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Text("Your fonts", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    myFonts.forEach { name ->
+                        val selected = a.customFontName == name
+                        val family = remember(name, fontsVersion) { CustomFonts.family(context, name) }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.large)
+                                .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest)
+                                .clickable { settings.setCustomFont(name) }
+                                .padding(start = 18.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
+                        ) {
+                            Text(
+                                name,
+                                fontFamily = family,
+                                style = MaterialTheme.typography.titleLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(onClick = {
+                                if (selected) settings.setFont(FontChoice.SANS)
+                                CustomFonts.delete(context, name)
+                                fontsVersion++
+                            }) {
+                                Icon(AppIcons.Delete, "Remove $name", tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        SectionCard(title = "Find a font") {
+            Text(
+                "Search Google Fonts, which has over 1,500 free fonts. Tap one to download it and use it everywhere in the app.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = fontQuery,
+                onValueChange = { fontQuery = it; fontError = null },
+                placeholder = { Text("e.g. Playfair Display, Lobster", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon = { Icon(AppIcons.Search, null) },
+                singleLine = true,
+                shape = MaterialTheme.shapes.extraLarge,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            fontError?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            }
+            Spacer(Modifier.height(10.dp))
+            val q = fontQuery.trim()
+            val matches = CustomFonts.POPULAR.filter { q.isEmpty() || it.contains(q, ignoreCase = true) }.take(if (q.isEmpty()) 12 else 20)
+            val options = if (q.isNotEmpty() && matches.none { it.equals(q, ignoreCase = true) }) listOf(q) + matches else matches
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                options.forEach { name ->
+                    val isTyped = name == q && CustomFonts.POPULAR.none { it.equals(q, ignoreCase = true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.medium)
+                            .clickable(enabled = downloading == null) {
+                                downloading = name
+                                fontError = null
+                                scope.launch {
+                                    CustomFonts.download(context, name)
+                                        .onSuccess { real -> settings.setCustomFont(real); fontsVersion++; fontQuery = "" }
+                                        .onFailure { fontError = it.message ?: "Couldn't download that font" }
+                                    downloading = null
+                                }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        Icon(AppIcons.FontDownload, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            if (isTyped) "Search Google Fonts for \"$name\"" else name,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        when {
+                            downloading == name -> LoadingIndicator(Modifier.size(28.dp))
+                            a.customFontName.equals(name, ignoreCase = true) -> Icon(AppIcons.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                            else -> Icon(AppIcons.Download, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         }
@@ -336,7 +490,20 @@ fun TextPage(settings: AppearanceSettings, onBack: () -> Unit) {
 fun StylePage(settings: AppearanceSettings, onBack: () -> Unit) {
     val a = LocalAppearance.current
     val c = MaterialTheme.colorScheme
-    SubPage("Style", onBack) {
+    SubPage("Style & layout", onBack) {
+        SectionCard(title = "Tab order") {
+            Text(
+                "Put the bottom tabs in any order. The first tab opens when you start the app.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = c.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            ReorderList(
+                items = a.tabOrder,
+                label = { it.label },
+                onMove = { settings.setTabOrder(it) },
+            )
+        }
         PreviewCard()
         SectionCard(title = "Corners") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -389,6 +556,36 @@ fun StylePage(settings: AppearanceSettings, onBack: () -> Unit) {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/** A list with up/down buttons to reorder items. */
+@Composable
+fun <T> ReorderList(items: List<T>, label: (T) -> String, onMove: (List<T>) -> Unit) {
+    val c = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items.forEachIndexed { i, item ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(c.surfaceContainerHighest, MaterialTheme.shapes.large)
+                    .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(28.dp).background(c.primary, CircleShape),
+                ) { Text("${i + 1}", style = MaterialTheme.typography.labelLarge, color = c.onPrimary) }
+                Spacer(Modifier.width(12.dp))
+                Text(label(item), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                IconButton(onClick = { onMove(items.toMutableList().apply { add(i - 1, removeAt(i)) }) }, enabled = i > 0) {
+                    Icon(AppIcons.KeyboardArrowUp, "Move ${label(item)} up")
+                }
+                IconButton(onClick = { onMove(items.toMutableList().apply { add(i + 1, removeAt(i)) }) }, enabled = i < items.lastIndex) {
+                    Icon(AppIcons.KeyboardArrowDown, "Move ${label(item)} down")
                 }
             }
         }

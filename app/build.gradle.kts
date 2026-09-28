@@ -81,6 +81,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.1")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("androidx.documentfile:documentfile:1.0.1")
+    // Home-screen widget
+    implementation("androidx.glance:glance-appwidget:1.1.1")
     // Claude (AI genres & recommendations)
     implementation("com.anthropic:anthropic-java:2.65.0")
     implementation("org.jetbrains.kotlin:kotlin-reflect:2.2.0")

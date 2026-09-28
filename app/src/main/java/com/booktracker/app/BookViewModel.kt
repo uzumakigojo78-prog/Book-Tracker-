@@ -14,7 +14,7 @@ import java.time.LocalDate
 
 class BookViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = BookRepository(application)
+    private val repository = BookRepository.get(application)
     val books = repository.books
 
     private val _loaded = MutableStateFlow(false)

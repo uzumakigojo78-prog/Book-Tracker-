@@ -44,21 +44,38 @@ enum class CornerStyle(val label: String) { EXTRA_ROUND("Extra round"), ROUNDED(
 enum class IconStyle(val label: String) { OUTLINED("Outlined"), ROUNDED("Rounded"), SHARP("Sharp"), FILLED("Filled") }
 
 enum class ColorPalette(val label: String) {
-    VIOLET("Violet"), OCEAN("Ocean"), FOREST("Forest"), SUNSET("Sunset"), ROSE("Rose"), DYNAMIC("Wallpaper"),
+    VIOLET("Violet"), OCEAN("Ocean"), FOREST("Forest"), SUNSET("Sunset"), ROSE("Rose"), DYNAMIC("Wallpaper"), CUSTOM("Custom"),
 }
+
+/** Bottom navigation tabs, in the order the reader chose. */
+enum class AppTab(val label: String) { BOOKS("Books"), GENRES("Genres"), STATS("Stats"), SETTINGS("Settings") }
+
+/** Sections of the Books tab. */
+enum class BookSection(val label: String) { READING("Currently reading"), WANT("Want to read"), READ("Read") }
 
 data class Appearance(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val palette: ColorPalette = ColorPalette.VIOLET,
     val textSize: TextSize = TextSize.DEFAULT,
-    val font: FontChoice = FontChoice.SANS,
+    /** A [FontChoice] name, or "gf:<Google Font family>" for a downloaded font. */
+    val font: String = FontChoice.SANS.name,
     val boldText: Boolean = true,
     val corners: CornerStyle = CornerStyle.EXTRA_ROUND,
     val iconStyle: IconStyle = IconStyle.OUTLINED,
+    /** Seed colour (ARGB) for the [ColorPalette.CUSTOM] palette. */
+    val customColor: Int = 0xFF6B2BD9.toInt(),
+    val tabOrder: List<AppTab> = AppTab.entries,
+    val sectionOrder: List<BookSection> = BookSection.entries,
 ) {
+    val builtInFont: FontChoice? get() = FontChoice.entries.firstOrNull { it.name == font }
+    val customFontName: String? get() = font.removePrefix(CUSTOM_FONT_PREFIX).takeIf { font.startsWith(CUSTOM_FONT_PREFIX) }
+    val fontLabel: String get() = builtInFont?.label ?: customFontName ?: "Sans"
+
     /** Weight for big numbers and headings. */
     val heavyWeight: FontWeight get() = if (boldText) FontWeight.Black else FontWeight.SemiBold
 }
+
+const val CUSTOM_FONT_PREFIX = "gf:"
 
 val LocalAppearance = staticCompositionLocalOf { Appearance() }
 
@@ -85,7 +102,7 @@ private val gold = a(0xFF7D5800, 0xFFFFFFFF, 0xFFFFDEA6, 0xFF271900) to a(0xFFF9
 
 private fun paletteColors(p: ColorPalette, dark: Boolean): PaletteColors {
     val (primary, secondary, tertiary) = when (p) {
-        ColorPalette.VIOLET, ColorPalette.DYNAMIC -> Triple(violet, pink, amber)
+        ColorPalette.VIOLET, ColorPalette.DYNAMIC, ColorPalette.CUSTOM -> Triple(violet, pink, amber)
         ColorPalette.OCEAN -> Triple(blue, teal, violet)
         ColorPalette.FOREST -> Triple(green, mint, amber)
         ColorPalette.SUNSET -> Triple(orange, pink, gold)
@@ -115,8 +132,30 @@ private val darkBase = darkColorScheme(
     surfaceContainerHigh = Color(0xFF2C2830), surfaceContainerHighest = Color(0xFF37333B),
 )
 
-private fun colorScheme(p: ColorPalette, dark: Boolean): ColorScheme {
-    val c = paletteColors(p, dark)
+/**
+ * Builds light or dark accent colours from any seed colour: the primary keeps the
+ * seed's hue, secondary and tertiary are neighbouring hues, all at M3-like tones.
+ */
+private fun seedColors(seed: Int, dark: Boolean): PaletteColors {
+    val hsl = FloatArray(3)
+    androidx.core.graphics.ColorUtils.colorToHSL(seed, hsl)
+    val hue = hsl[0]
+    // Keep greys grey, but give everything else enough colour to look bold.
+    val sat = if (hsl[1] < 0.08f) hsl[1] else hsl[1].coerceIn(0.45f, 0.9f)
+    fun accent(h: Float, s: Float): Accent {
+        val hh = (h % 360f + 360f) % 360f
+        fun c(l: Float) = Color.hsl(hh, s, l)
+        return if (dark) Accent(c(0.80f), c(0.20f), c(0.30f), c(0.90f))
+        else Accent(c(0.40f), Color.White, c(0.90f), c(0.12f))
+    }
+    return PaletteColors(accent(hue, sat), accent(hue - 35f, sat * 0.85f), accent(hue + 65f, sat * 0.85f))
+}
+
+/** Main colour of a seed palette, for swatches. */
+fun seedSwatch(seed: Int, dark: Boolean): List<Color> = seedColors(seed, dark).let { listOf(it.primary.main, it.secondary.main, it.tertiary.main) }
+
+private fun colorScheme(p: ColorPalette, dark: Boolean, seed: Int): ColorScheme {
+    val c = if (p == ColorPalette.CUSTOM) seedColors(seed, dark) else paletteColors(p, dark)
     return (if (dark) darkBase else lightBase).copy(
         primary = c.primary.main, onPrimary = c.primary.on,
         primaryContainer = c.primary.container, onPrimaryContainer = c.primary.onContainer,
@@ -131,10 +170,9 @@ private fun colorScheme(p: ColorPalette, dark: Boolean): ColorScheme {
 
 /* ---------- type ---------- */
 
-private fun buildTypography(appearance: Appearance): Typography {
+private fun buildTypography(appearance: Appearance, family: FontFamily): Typography {
     val base = Typography()
     val scale = appearance.textSize.scale
-    val family = appearance.font.family
     val bold = appearance.boldText
     fun TextStyle.adjust(boldWeight: FontWeight?, spacing: Float? = null) = copy(
         fontSize = fontSize * scale,
@@ -210,9 +248,14 @@ fun BookTrackerTheme(
     val colors = if (appearance.palette == ColorPalette.DYNAMIC && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     } else {
-        colorScheme(appearance.palette, dark)
+        colorScheme(appearance.palette, dark, appearance.customColor)
     }
-    val typography = remember(appearance.textSize, appearance.font, appearance.boldText) { buildTypography(appearance) }
+    val family = remember(appearance.font) {
+        appearance.builtInFont?.family
+            ?: appearance.customFontName?.let { com.booktracker.app.settings.CustomFonts.family(context, it) }
+            ?: FontFamily.SansSerif
+    }
+    val typography = remember(appearance.textSize, family, appearance.boldText) { buildTypography(appearance, family) }
     val shapes = remember(appearance.corners) { buildShapes(appearance.corners) }
 
     CompositionLocalProvider(LocalAppearance provides appearance) {

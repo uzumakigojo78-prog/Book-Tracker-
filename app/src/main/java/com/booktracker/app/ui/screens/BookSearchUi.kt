@@ -54,6 +54,7 @@ import com.booktracker.app.ai.CatalogBook
 import com.booktracker.app.ai.GENRES
 import com.booktracker.app.data.Book
 import com.booktracker.app.data.BookDetails
+import com.booktracker.app.ui.components.ButtonText
 import com.booktracker.app.ui.components.BookBadge
 import com.booktracker.app.ui.components.bookAccent
 import com.booktracker.app.ui.components.pretty
@@ -67,7 +68,7 @@ fun BookSearchField(query: String, onQuery: (String) -> Unit, searching: Boolean
     OutlinedTextField(
         value = query,
         onValueChange = onQuery,
-        placeholder = { Text("Search any book, author or topic") },
+        placeholder = { Text("Search any book, author or topic", maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingIcon = { Icon(AppIcons.Search, null) },
         trailingIcon = {
             if (query.isNotEmpty()) IconButton(onClick = { onQuery(""); focus.clearFocus() }) { Icon(AppIcons.Close, "Clear search") }
@@ -196,7 +197,7 @@ fun BookInfoSheet(
                 ) {
                     Icon(AppIcons.CheckCircle, null)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (addedId != null) "Added · Open book" else "In your books · Open", style = MaterialTheme.typography.titleSmall)
+                    ButtonText(if (addedId != null) "Added · Open book" else "In your books · Open", MaterialTheme.typography.titleSmall)
                 }
 
                 book.pages != null -> Button(
@@ -210,7 +211,7 @@ fun BookInfoSheet(
                 ) {
                     Icon(AppIcons.LibraryAdd, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Add to my books", style = MaterialTheme.typography.titleSmall)
+                    ButtonText("Add to my books", MaterialTheme.typography.titleSmall)
                 }
 
                 // Page count unknown: let the reader fill it in.
@@ -221,7 +222,7 @@ fun BookInfoSheet(
                 ) {
                     Icon(AppIcons.LibraryAdd, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Add to my books…", style = MaterialTheme.typography.titleSmall)
+                    ButtonText("Add to my books…", MaterialTheme.typography.titleSmall)
                 }
             }
 
@@ -231,7 +232,7 @@ fun BookInfoSheet(
                 FilledTonalButton(onClick = { uri.openUri(pdf) }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
                     Icon(AppIcons.Download, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Download free PDF", style = MaterialTheme.typography.titleSmall)
+                    ButtonText("Download free PDF", MaterialTheme.typography.titleSmall)
                 }
                 Text(
                     "Public domain, free and legal to download.",
@@ -295,7 +296,7 @@ private fun LinkButton(icon: ImageVector, text: String, onClick: () -> Unit) {
     OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth().height(50.dp)) {
         Icon(icon, null, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(8.dp))
-        Text(text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+        ButtonText(text, MaterialTheme.typography.titleSmall, Modifier.weight(1f))
         Icon(AppIcons.OpenInNew, null, modifier = Modifier.size(16.dp))
     }
 }

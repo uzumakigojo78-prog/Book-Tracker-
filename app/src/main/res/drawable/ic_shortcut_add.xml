@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcut icon: a white Material symbol on a violet circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#6B2BD9"
+        android:pathData="M12,0a12,12 0 1,1 0,24a12,12 0 1,1 0,-24z" />
+    <group
+        android:scaleX="0.6"
+        android:scaleY="0.6"
+        android:translateX="4.8"
+        android:translateY="4.8">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+    </group>
+</vector>

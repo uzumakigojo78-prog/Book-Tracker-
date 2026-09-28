@@ -5,6 +5,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.ui.text.style.TextOverflow
+import com.booktracker.app.ui.components.ButtonText
 import com.booktracker.app.ui.components.DailyBarChart
 import com.booktracker.app.ui.components.SectionCard
 import com.booktracker.app.ui.theme.AppIcons
@@ -90,6 +91,7 @@ import java.util.Locale
 fun BookDetailScreen(
     book: Book,
     colorIndex: Int,
+    initialTab: Int = 0,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -101,7 +103,7 @@ fun BookDetailScreen(
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    val pager = rememberPagerState { DetailTab.entries.size }
+    val pager = rememberPagerState(initialPage = initialTab) { DetailTab.entries.size }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -165,7 +167,7 @@ fun BookDetailScreen(
                         ) {
                             Icon(AppIcons.Download, null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Find online copies", style = MaterialTheme.typography.titleSmall)
+                            ButtonText("Find online copies", MaterialTheme.typography.titleSmall)
                         }
                     }
                 }
@@ -271,7 +273,7 @@ private fun TodaySummary(book: Book, colorIndex: Int, onLog: () -> Unit) {
                 ) {
                     Icon(AppIcons.Edit, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Log reading", style = MaterialTheme.typography.titleSmall)
+                    ButtonText("Log reading", MaterialTheme.typography.titleSmall)
                 }
             }
         }
@@ -399,7 +401,7 @@ private fun LogReadingCard(book: Book, onSave: (LocalDate, Int) -> Unit) {
             FilledTonalButton(onClick = { pickDate = true }, modifier = Modifier.height(48.dp)) {
                 Icon(AppIcons.CalendarMonth, null)
                 Spacer(Modifier.width(8.dp))
-                Text(date.relative())
+                ButtonText(date.relative(), MaterialTheme.typography.labelLarge)
             }
             Spacer(Modifier.height(16.dp))
             OutlinedTextField(
@@ -429,7 +431,7 @@ private fun LogReadingCard(book: Book, onSave: (LocalDate, Int) -> Unit) {
                         onClick = { bump(step) },
                         contentPadding = PaddingValues(0.dp),
                         modifier = Modifier.weight(1f).height(48.dp),
-                    ) { Text("+$step") }
+                    ) { ButtonText("+$step", MaterialTheme.typography.labelLarge) }
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -443,14 +445,14 @@ private fun LogReadingCard(book: Book, onSave: (LocalDate, Int) -> Unit) {
                     shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.weight(1f).height(64.dp),
                 ) {
-                    Text("Save page", style = MaterialTheme.typography.titleMedium)
+                    ButtonText("Save page", MaterialTheme.typography.titleMedium)
                 }
                 Spacer(Modifier.width(12.dp))
                 FilledTonalIconButton(
                     onClick = { pageText = book.totalPages.toString() },
                     modifier = Modifier.size(64.dp),
                 ) {
-                    Text("END", style = MaterialTheme.typography.labelLarge)
+                    ButtonText("END", MaterialTheme.typography.labelLarge)
                 }
             }
         }

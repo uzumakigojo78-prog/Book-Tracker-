@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.booktracker.app.ai.AiProvider
 import com.booktracker.app.ai.GenreViewModel
+import com.booktracker.app.ui.components.ButtonText
 import com.booktracker.app.ui.components.ChoiceButton
 import com.booktracker.app.ui.components.SectionCard
 import com.booktracker.app.ui.components.SubPage
@@ -196,13 +197,13 @@ fun AiSettingsPage(vm: GenreViewModel, onBack: () -> Unit) {
                 enabled = ready,
                 shapes = ButtonDefaults.shapes(),
                 modifier = Modifier.fillMaxWidth().height(56.dp),
-            ) { Text("Save and use ${provider.label}", style = MaterialTheme.typography.titleSmall) }
+            ) { ButtonText("Save and use ${provider.label}", MaterialTheme.typography.titleSmall) }
             provider.keyUrl?.let { url ->
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(onClick = { uri.openUri(url) }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
                     Icon(AppIcons.OpenInNew, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Get a ${provider.label} API key", style = MaterialTheme.typography.titleSmall)
+                    ButtonText("Get a ${provider.label} API key", MaterialTheme.typography.titleSmall)
                 }
             }
         }

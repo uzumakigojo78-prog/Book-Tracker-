@@ -33,6 +33,16 @@ indicators and springy motion.
 - **Get a copy**: links for any book or recommendation to free, legal sources:
   public-domain downloads and free borrowing via Open Library / the Internet Archive,
   Project Gutenberg, and Google Books.
+- **Books tab sections**: Currently reading, Want to read and Read, collapsible and in any
+  order (the reorder button next to "My Books").
+- **Make it yours**: any Google Font as the main font (search 1,500+ fonts in Settings → Text),
+  a colour wheel to build the whole colour scheme from any colour, and a reorderable bottom
+  tab bar (Settings → Style & layout).
+- **Home-screen widget** (Android): your current book with cover, progress and today's pages,
+  plus quick buttons for +10 pages, Finish, Log, Add book and Settings. Long-press the app icon
+  for shortcuts too.
+- **Developer page** (Settings → Developer): version info, GitHub links, what's new, and an
+  update check that links straight to the newest APK.
 - **Automatic CSV backups** (Android): every 15 min, 30 min, 1, 3, 6 or 12 hours, daily
   or weekly, saved as spreadsheet-friendly CSV files in a folder you choose on your
   phone (newest 50 kept). Includes "Back up now" and "Restore from a CSV backup".

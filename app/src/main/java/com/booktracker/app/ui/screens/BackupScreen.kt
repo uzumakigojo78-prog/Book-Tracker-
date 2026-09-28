@@ -1,5 +1,6 @@
 package com.booktracker.app.ui.screens
 
+import com.booktracker.app.ui.components.ButtonText
 import com.booktracker.app.ui.theme.AppIcons
 import com.booktracker.app.ui.theme.LocalAppearance
 import android.content.Intent
@@ -285,7 +286,7 @@ fun BackupScreen(
             ) {
                 Icon(AppIcons.Save, null)
                 Spacer(Modifier.width(10.dp))
-                Text(if (busy) "Backing up…" else "Back up now", style = MaterialTheme.typography.titleMedium)
+                ButtonText(if (busy) "Backing up…" else "Back up now", MaterialTheme.typography.titleMedium)
             }
             OutlinedButton(
                 onClick = { restoreLauncher.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel", "application/octet-stream")) },
@@ -293,7 +294,7 @@ fun BackupScreen(
             ) {
                 Icon(AppIcons.Restore, null)
                 Spacer(Modifier.width(10.dp))
-                Text("Restore from a CSV backup", style = MaterialTheme.typography.titleSmall)
+                ButtonText("Restore from a CSV backup", MaterialTheme.typography.titleSmall)
             }
             Text(
                 "Each backup is a new CSV file (open it in any spreadsheet app). The newest ${BackupManager.KEEP_BACKUPS} are kept.",
@@ -412,7 +413,7 @@ private fun PermissionRow(
             Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         AnimatedVisibility(visible = !granted || action == "Change") {
-            FilledTonalButton(onClick = onClick, modifier = Modifier.padding(start = 8.dp)) { Text(action) }
+            FilledTonalButton(onClick = onClick, modifier = Modifier.padding(start = 8.dp)) { ButtonText(action, MaterialTheme.typography.labelLarge) }
         }
     }
 }

@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
 import com.booktracker.app.ui.theme.AppIcons
 import com.booktracker.app.ui.theme.LocalAppearance
@@ -216,4 +217,24 @@ fun NavRow(icon: ImageVector, title: String, subtitle: String, iconBg: Color, ic
         }
         Icon(AppIcons.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+/**
+ * A one-line button label that shrinks to fit instead of wrapping or being cut
+ * off, whatever the font and text size.
+ */
+@Composable
+fun ButtonText(text: String, style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleSmall, modifier: Modifier = Modifier) {
+    val color = androidx.compose.material3.LocalContentColor.current
+    androidx.compose.foundation.text.BasicText(
+        text = text,
+        style = style.copy(color = color),
+        maxLines = 1,
+        autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(
+            minFontSize = 9.sp,
+            maxFontSize = if (style.fontSize.isSpecified) style.fontSize else 16.sp,
+            stepSize = 0.5.sp,
+        ),
+        modifier = modifier,
+    )
 }

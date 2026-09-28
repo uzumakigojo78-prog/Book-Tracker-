@@ -48,7 +48,7 @@ object BackupManager {
                 ?.takeIf { it.exists() && it.canWrite() }
                 ?: error("Can't write to the backup folder. Please choose it again.")
 
-            val repository = BookRepository(context)
+            val repository = BookRepository.get(context)
             repository.load()
             val books = repository.books.value
 
