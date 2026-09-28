@@ -1,5 +1,7 @@
 package com.booktracker.app.ui.screens
 
+import com.booktracker.app.ui.theme.AppIcons
+import com.booktracker.app.ui.theme.LocalAppearance
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -24,14 +26,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.MenuBook
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Clear
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Event
-import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -155,11 +149,11 @@ fun BookEditorScreen(
                     Text(
                         if (book == null) "Add a book" else "Edit book",
                         style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Black,
+                        fontWeight = LocalAppearance.current.heavyWeight,
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "Close") }
+                    IconButton(onClick = onClose) { Icon(AppIcons.Close, "Close") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
@@ -189,7 +183,7 @@ fun BookEditorScreen(
                     autoFilled = false
                 },
                 label = { Text("Book name") },
-                leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                leadingIcon = { Icon(AppIcons.Search, null) },
                 trailingIcon = {
                     AnimatedContent(
                         targetState = searching,
@@ -202,7 +196,7 @@ fun BookEditorScreen(
                                 title = ""
                                 autoFilled = false
                                 titleFocus.requestFocus()
-                            }) { Icon(Icons.Rounded.Clear, "Clear title") }
+                            }) { Icon(AppIcons.Clear, "Clear title") }
                         }
                     }
                 },
@@ -255,7 +249,7 @@ fun BookEditorScreen(
                 value = author,
                 onValueChange = { author = it },
                 label = { Text("Author") },
-                leadingIcon = { Icon(Icons.Rounded.Person, null) },
+                leadingIcon = { Icon(AppIcons.Person, null) },
                 singleLine = true,
                 textStyle = MaterialTheme.typography.titleLarge,
                 shape = MaterialTheme.shapes.large,
@@ -266,9 +260,9 @@ fun BookEditorScreen(
                 value = releaseDate?.pretty() ?: "",
                 label = "Release date",
                 onClick = { pickDate = true },
-                leadingIcon = { Icon(Icons.Rounded.Event, null) },
+                leadingIcon = { Icon(AppIcons.Event, null) },
                 trailingIcon = if (releaseDate != null) {
-                    { IconButton(onClick = { releaseDate = null }) { Icon(Icons.Rounded.Clear, "Clear date") } }
+                    { IconButton(onClick = { releaseDate = null }) { Icon(AppIcons.Clear, "Clear date") } }
                 } else null,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -276,7 +270,7 @@ fun BookEditorScreen(
                 value = pagesText,
                 onValueChange = { new -> pagesText = new.filter { it.isDigit() }.take(6) },
                 label = { Text("Total pages") },
-                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.MenuBook, null) },
+                leadingIcon = { Icon(AppIcons.MenuBook, null) },
                 isError = pagesError,
                 supportingText = if (pagesError) {
                     { Text("How many pages does it have?") }
@@ -385,7 +379,7 @@ private fun FilledBanner(title: String, coverUrl: String?, autoFilled: Boolean, 
             if (autoFilled) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        Icons.Rounded.AutoAwesome,
+                        AppIcons.AutoAwesome,
                         null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),

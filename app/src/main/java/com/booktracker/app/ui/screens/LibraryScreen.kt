@@ -1,5 +1,7 @@
 package com.booktracker.app.ui.screens
 
+import com.booktracker.app.ui.theme.AppIcons
+import com.booktracker.app.ui.theme.LocalAppearance
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,11 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.MenuBook
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Backup
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -53,14 +50,15 @@ fun LibraryScreen(
     books: List<Book>,
     onAddBook: () -> Unit,
     onOpenBook: (String) -> Unit,
-    onOpenBackups: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     // No top app bar: the heading scrolls with the list so the whole screen is content.
     Scaffold(
+        modifier = modifier,
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onAddBook,
-                icon = { Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(28.dp)) },
+                icon = { Icon(AppIcons.Add, contentDescription = null, modifier = Modifier.size(28.dp)) },
                 text = { Text("Add book", style = MaterialTheme.typography.titleMedium) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -70,7 +68,7 @@ fun LibraryScreen(
     ) { padding ->
         if (books.isEmpty()) {
             Column(Modifier.padding(padding)) {
-                Header(onOpenBackups, Modifier.padding(start = 20.dp, end = 8.dp, top = 12.dp))
+                Header(books, Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp))
                 EmptyLibrary()
             }
         } else {
@@ -87,8 +85,7 @@ fun LibraryScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                item { Header(onOpenBackups, Modifier.padding(start = 4.dp)) }
-                item { StatsRow(books) }
+                item { Header(books, Modifier.padding(start = 4.dp, bottom = 4.dp)) }
                 itemsIndexed(ordered, key = { _, it -> it.value.id }) { _, (colorIndex, book) ->
                     BookCard(book, colorIndex, onClick = { onOpenBook(book.id) }, modifier = Modifier.animateItem())
                 }
@@ -98,53 +95,23 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun Header(onOpenBackups: () -> Unit, modifier: Modifier = Modifier) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier.fillMaxWidth()) {
-        Text(
-            "My Books",
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Black,
-            modifier = Modifier.weight(1f),
-        )
-        FilledTonalIconButton(onClick = onOpenBackups, modifier = Modifier.size(52.dp)) {
-            Icon(Icons.Rounded.Backup, contentDescription = "Backups")
+private fun Header(books: List<Book>, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth()) {
+        Text("My Books", style = MaterialTheme.typography.displaySmall, fontWeight = LocalAppearance.current.heavyWeight)
+        if (books.isNotEmpty()) {
+            val reading = books.count { !it.isFinished }
+            Text(
+                "$reading reading · ${books.size - reading} finished",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-    }
-}
-
-@Composable
-private fun StatsRow(books: List<Book>) {
-    val reading = books.count { !it.isFinished }
-    val today = books.sumOf { it.pagesToday }
-    val finished = books.count { it.isFinished }
-    val c = MaterialTheme.colorScheme
-    // Equal-height tiles even when a label wraps onto two lines.
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-    ) {
-        StatTile("Reading", reading.toString(), c.primary, c.onPrimary, Modifier.weight(1f))
-        StatTile("Pages today", today.toString(), c.secondary, c.onSecondary, Modifier.weight(1f))
-        StatTile("Finished", finished.toString(), c.tertiary, c.onTertiary, Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun StatTile(label: String, value: String, bg: Color, fg: Color, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .background(bg, MaterialTheme.shapes.large)
-            .padding(horizontal = 14.dp, vertical = 16.dp),
-    ) {
-        Text(value, style = MaterialTheme.typography.displaySmall, color = fg, maxLines = 1)
-        Text(label, style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 2, lineHeight = 18.sp)
     }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun BookCard(book: Book, colorIndex: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun BookCard(book: Book, colorIndex: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val (container, onContainer) = bookColors(colorIndex)
     val (accent, _) = bookAccent(colorIndex)
     Card(
@@ -173,7 +140,7 @@ private fun BookCard(book: Book, colorIndex: Int, onClick: () -> Unit, modifier:
                 }
                 if (book.isFinished) {
                     Icon(
-                        Icons.Rounded.CheckCircle,
+                        AppIcons.CheckCircle,
                         contentDescription = "Finished",
                         tint = accent,
                         modifier = Modifier.size(36.dp),
@@ -197,7 +164,7 @@ private fun BookCard(book: Book, colorIndex: Int, onClick: () -> Unit, modifier:
                 Text(
                     "${(book.progress * 100).toInt()}%",
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Black,
+                    fontWeight = LocalAppearance.current.heavyWeight,
                 )
             }
         }
@@ -218,7 +185,7 @@ private fun EmptyLibrary(modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.AutoMirrored.Rounded.MenuBook,
+                AppIcons.MenuBook,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(72.dp),

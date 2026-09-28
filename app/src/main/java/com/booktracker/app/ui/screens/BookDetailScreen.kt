@@ -1,5 +1,14 @@
 package com.booktracker.app.ui.screens
 
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
+import androidx.compose.ui.text.style.TextOverflow
+import com.booktracker.app.ui.components.DailyBarChart
+import com.booktracker.app.ui.components.SectionCard
+import com.booktracker.app.ui.theme.AppIcons
+import com.booktracker.app.ui.theme.LocalAppearance
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -20,15 +29,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.LocalFireDepartment
-import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -77,7 +77,7 @@ import com.booktracker.app.ui.components.bookAccent
 import com.booktracker.app.ui.components.bookColors
 import com.booktracker.app.ui.components.pretty
 import com.booktracker.app.ui.components.relative
-import com.booktracker.app.ui.theme.HeroNumber
+import com.booktracker.app.ui.theme.heroNumber
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -98,59 +98,98 @@ fun BookDetailScreen(
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    val pager = rememberPagerState { DetailTab.entries.size }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(
-                title = {},
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
-                },
-                actions = {
-                    IconButton(onClick = onEdit) { Icon(Icons.Rounded.Edit, "Edit book") }
-                    IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Rounded.Delete, "Delete book") }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
+            Column(Modifier.background(MaterialTheme.colorScheme.background)) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            book.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) { Icon(AppIcons.ArrowBack, "Back") }
+                    },
+                    actions = {
+                        IconButton(onClick = onEdit) { Icon(AppIcons.Edit, "Edit book") }
+                        IconButton(onClick = { confirmDelete = true }) { Icon(AppIcons.Delete, "Delete book") }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                )
+                PrimaryTabRow(
+                    selectedTabIndex = pager.currentPage,
+                    containerColor = MaterialTheme.colorScheme.background,
+                ) {
+                    DetailTab.entries.forEachIndexed { i, tab ->
+                        Tab(
+                            selected = pager.currentPage == i,
+                            onClick = { scope.launch { pager.animateScrollToPage(i) } },
+                            text = { Text(tab.label, style = MaterialTheme.typography.titleSmall) },
+                            icon = { Icon(tab.icon(), null) },
+                        )
+                    }
+                }
+            }
         },
     ) { padding ->
-        LazyColumn(
-            contentPadding = PaddingValues(
+        HorizontalPager(
+            state = pager,
+            modifier = Modifier.padding(top = padding.calculateTopPadding()),
+            beyondViewportPageCount = 1,
+        ) { page ->
+            val listPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
-                top = padding.calculateTopPadding(),
+                top = 16.dp,
                 bottom = padding.calculateBottomPadding() + 32.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item { HeroCard(book, colorIndex) }
-            item {
-                LogReadingCard(book) { date, page ->
-                    onLogPage(date, page)
-                    scope.launch { snackbar.showSnackbar("Saved page $page · ${date.relative()}") }
+            )
+            when (DetailTab.entries[page]) {
+                DetailTab.OVERVIEW -> LazyColumn(contentPadding = listPadding, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    item { HeroCard(book, colorIndex) }
+                    item {
+                        TodaySummary(book, colorIndex, onLog = { scope.launch { pager.animateScrollToPage(DetailTab.LOG.ordinal) } })
+                    }
                 }
-            }
-            item { ChartCard(book, colorIndex) }
-            item {
-                Text(
-                    "Daily log",
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(top = 8.dp, start = 4.dp),
-                )
-            }
-            val days = book.dailyPages
-            if (days.isEmpty()) {
-                item {
-                    Text(
-                        "Nothing logged yet. Save the page you reached today to start your log.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                    )
+
+                DetailTab.LOG -> LazyColumn(contentPadding = listPadding, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    item {
+                        LogReadingCard(book) { date, page ->
+                            onLogPage(date, page)
+                            scope.launch { snackbar.showSnackbar("Saved page $page · ${date.relative()}") }
+                        }
+                    }
                 }
-            } else {
-                items(days, key = { it.date.toString() }) { day ->
-                    HistoryRow(day, colorIndex, onDelete = { onDeleteEntry(day.date) }, modifier = Modifier.animateItem())
+
+                DetailTab.HISTORY -> LazyColumn(contentPadding = listPadding, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    item { ChartCard(book, colorIndex) }
+                    item {
+                        Text(
+                            "Daily log",
+                            style = MaterialTheme.typography.headlineMedium,
+                            modifier = Modifier.padding(top = 8.dp, start = 4.dp),
+                        )
+                    }
+                    val days = book.dailyPages
+                    if (days.isEmpty()) {
+                        item {
+                            Text(
+                                "Nothing logged yet. Save the page you reached today on the Log tab to start your log.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                        }
+                    } else {
+                        items(days, key = { it.date.toString() }) { day ->
+                            HistoryRow(day, colorIndex, onDelete = { onDeleteEntry(day.date) }, modifier = Modifier.animateItem())
+                        }
+                    }
                 }
             }
         }
@@ -159,7 +198,7 @@ fun BookDetailScreen(
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            icon = { Icon(Icons.Rounded.Delete, null) },
+            icon = { Icon(AppIcons.Delete, null) },
             title = { Text("Delete this book?") },
             text = { Text("\"${book.title}\" and its whole reading log will be removed.") },
             confirmButton = {
@@ -173,6 +212,47 @@ fun BookDetailScreen(
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
         )
+    }
+}
+
+private enum class DetailTab(val label: String) {
+    OVERVIEW("Overview"), LOG("Log"), HISTORY("History");
+
+    @Composable
+    fun icon(): ImageVector = when (this) {
+        OVERVIEW -> AppIcons.MenuBook
+        LOG -> AppIcons.Edit
+        HISTORY -> AppIcons.History
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun TodaySummary(book: Book, colorIndex: Int, onLog: () -> Unit) {
+    val (accent, onAccent) = bookAccent(colorIndex)
+    SectionCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Today", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (book.pagesToday > 0) "+${book.pagesToday} pages" else "Not logged yet",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = LocalAppearance.current.heavyWeight,
+                )
+            }
+            if (!book.isFinished) {
+                Button(
+                    onClick = onLog,
+                    shapes = ButtonDefaults.shapes(),
+                    colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = onAccent),
+                    modifier = Modifier.height(56.dp),
+                ) {
+                    Icon(AppIcons.Edit, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Log reading", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
     }
 }
 
@@ -200,8 +280,8 @@ private fun HeroCard(book: Book, colorIndex: Int) {
                         style = if (book.coverUrl != null) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displaySmall,
                     )
                     Spacer(Modifier.height(12.dp))
-                    if (book.author.isNotBlank()) InfoLine(Icons.Rounded.Person, book.author)
-                    InfoLine(Icons.Rounded.Event, book.releaseDate?.let { "Released ${it.pretty()}" } ?: "Release date unknown")
+                    if (book.author.isNotBlank()) InfoLine(AppIcons.Person, book.author)
+                    InfoLine(AppIcons.Event, book.releaseDate?.let { "Released ${it.pretty()}" } ?: "Release date unknown")
                 }
             }
             Spacer(Modifier.height(24.dp))
@@ -216,7 +296,7 @@ private fun HeroCard(book: Book, colorIndex: Int) {
                         modifier = Modifier.size(170.dp),
                     )
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("${(book.progress * 100).toInt()}%", style = HeroNumber)
+                        Text("${(book.progress * 100).toInt()}%", style = heroNumber)
                         if (book.isFinished) Text("Finished!", style = MaterialTheme.typography.labelLarge)
                     }
                 }
@@ -227,7 +307,7 @@ private fun HeroCard(book: Book, colorIndex: Int) {
                     val streak = streak(book)
                     if (streak > 0) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.LocalFireDepartment, null, tint = accent)
+                            Icon(AppIcons.LocalFireDepartment, null, tint = accent)
                             Spacer(Modifier.width(4.dp))
                             Text("$streak day streak", style = MaterialTheme.typography.titleSmall)
                         }
@@ -250,7 +330,7 @@ private fun InfoLine(icon: ImageVector, text: String) {
 @Composable
 private fun BigStat(value: String, label: String) {
     Column {
-        Text(value, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Black)
+        Text(value, style = MaterialTheme.typography.headlineLarge, fontWeight = LocalAppearance.current.heavyWeight)
         Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }
@@ -295,7 +375,7 @@ private fun LogReadingCard(book: Book, onSave: (LocalDate, Int) -> Unit) {
             Text("Log your reading", style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(16.dp))
             FilledTonalButton(onClick = { pickDate = true }, modifier = Modifier.height(48.dp)) {
-                Icon(Icons.Rounded.CalendarMonth, null)
+                Icon(AppIcons.CalendarMonth, null)
                 Spacer(Modifier.width(8.dp))
                 Text(date.relative())
             }
@@ -371,51 +451,13 @@ private fun ChartCard(book: Book, colorIndex: Int) {
     val byDate = book.dailyPages.associate { it.date to it.pagesRead }
     val days = (13 downTo 0).map { today.minusDays(it.toLong()) }
     val values = days.map { byDate[it] ?: 0 }
-    val max = (values.maxOrNull() ?: 0).coerceAtLeast(1)
-    val total = values.sum()
-
-    Card(
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(24.dp)) {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text("Last 14 days", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                Text("$total pages", style = MaterialTheme.typography.titleMedium, color = accent)
-            }
-            Spacer(Modifier.height(20.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                verticalAlignment = Alignment.Bottom,
-                modifier = Modifier.fillMaxWidth().height(140.dp),
-            ) {
-                values.forEachIndexed { i, v ->
-                    val target = if (v == 0) 0.04f else (v.toFloat() / max).coerceAtLeast(0.08f)
-                    val fraction by animateFloatAsState(target, spring(dampingRatio = 0.55f, stiffness = 220f), label = "bar")
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .fillMaxHeight(fraction)
-                            .background(
-                                if (v == 0) MaterialTheme.colorScheme.outlineVariant else if (days[i] == today) MaterialTheme.colorScheme.secondary else accent,
-                                RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 4.dp, bottomEnd = 4.dp),
-                            )
-                    )
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                days.forEach { d ->
-                    Text(
-                        d.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
-                        style = MaterialTheme.typography.labelSmall,
-                        textAlign = TextAlign.Center,
-                        color = if (d == today) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
+    SectionCard {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("Last 14 days", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            Text("${values.sum()} pages", style = MaterialTheme.typography.titleMedium, color = accent)
         }
+        Spacer(Modifier.height(20.dp))
+        DailyBarChart(days, values, accent)
     }
 }
 
@@ -438,7 +480,7 @@ private fun HistoryRow(day: DailyPages, colorIndex: Int, onDelete: () -> Unit, m
             Text(
                 "+${day.pagesRead}",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Black,
+                fontWeight = LocalAppearance.current.heavyWeight,
                 color = onContainer,
             )
         }
@@ -452,7 +494,7 @@ private fun HistoryRow(day: DailyPages, colorIndex: Int, onDelete: () -> Unit, m
             )
         }
         IconButton(onClick = onDelete) {
-            Icon(Icons.Rounded.Close, "Remove entry", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(AppIcons.Close, "Remove entry", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
