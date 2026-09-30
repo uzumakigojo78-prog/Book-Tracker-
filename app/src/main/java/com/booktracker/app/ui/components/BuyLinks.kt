@@ -17,58 +17,27 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.booktracker.app.MainActivity
 import com.booktracker.app.data.BuyLinks
-import com.booktracker.app.settings.LibrarySettings
 import com.booktracker.app.ui.theme.AppIcons
 
 /**
- * "Get it from your library" plus a grid of stores to buy the book from. Shown with
- * every book description.
+ * A grid of stores to buy the book from. Shown with every book description.
  */
 @Composable
 fun BuySection(title: String, author: String, modifier: Modifier = Modifier) {
-    val activity = LocalContext.current
-    val context = activity.applicationContext
-    val settings = remember { LibrarySettings(context) }
-    val library by remember { settings.changes() }.collectAsState(initial = settings.read())
     val uri = LocalUriHandler.current
     val c = MaterialTheme.colorScheme
     val stores = remember(title, author) { BuyLinks.forBook(title, author) }
-    val query = listOf(title, author).filter { it.isNotBlank() }.joinToString(" ")
 
     Column(modifier.fillMaxWidth()) {
-        Text("Get this book", style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(8.dp))
-        val lib = library
-        val catalog = lib?.catalogSearch(query)
-        when {
-            lib != null && catalog != null -> StoreTile(
-                AppIcons.LocalLibrary, "Check ${lib.name}", "See if it's on the shelf in the catalog",
-                c.tertiary, c.onTertiary, Modifier.fillMaxWidth(),
-            ) { uri.openUri(catalog) }
-
-            // No catalog linked yet: the Library tab sets it up.
-            lib != null -> StoreTile(
-                AppIcons.LocalLibrary, "Check ${lib.name}", "Link its catalog in the Library tab",
-                c.tertiaryContainer, c.onTertiaryContainer, Modifier.fillMaxWidth(),
-            ) { activity.startActivity(MainActivity.deepLink(activity, "library")) }
-
-            else -> StoreTile(
-                AppIcons.LocalLibrary, "Borrow it from your library", "Link your library in the Library tab",
-                c.tertiaryContainer, c.onTertiaryContainer, Modifier.fillMaxWidth(),
-            ) { activity.startActivity(MainActivity.deepLink(activity, "library")) }
-        }
+        Text("Buy this book", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             stores.chunked(2).forEach { pair ->
