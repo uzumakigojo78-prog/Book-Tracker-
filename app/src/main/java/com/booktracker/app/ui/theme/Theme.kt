@@ -48,7 +48,7 @@ enum class ColorPalette(val label: String) {
 }
 
 /** Bottom navigation tabs, in the order the reader chose. */
-enum class AppTab(val label: String) { BOOKS("Books"), GENRES("Genres"), LIBRARY("Library"), STATS("Stats"), SETTINGS("Settings") }
+enum class AppTab(val label: String) { BOOKS("Books"), GENRES("Genres"), STATS("Stats"), SETTINGS("Settings") }
 
 /** Sections of the Books tab. */
 enum class BookSection(val label: String) { READING("Currently reading"), WANT("Want to read"), READ("Read") }
